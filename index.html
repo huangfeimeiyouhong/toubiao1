@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>食安管理平台 · Food Safety Management Platform</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+</head>
+<body>
+  <!-- ================= 登录 / 角色选择 ================= -->
+  <div id="login" class="login">
+    <div class="login-bg"></div>
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-logo">食</div>
+        <div>
+          <h1>食安管理平台</h1>
+          <p>Food Safety Management Platform · 智慧食安一体化监管系统</p>
+        </div>
+      </div>
+
+      <form id="loginForm" class="login-form" autocomplete="off">
+        <div class="login-tip">
+          <span class="dot"></span> 请选择登录身份，输入账号与密码进入系统
+        </div>
+
+        <label class="lf-label" for="loginRole">登录身份</label>
+        <select id="loginRole" class="input lf-input"><!-- 由 JS 渲染 --></select>
+
+        <label class="lf-label" for="loginUser">账号</label>
+        <input id="loginUser" class="input lf-input" placeholder="请输入账号" autocomplete="username" />
+
+        <label class="lf-label" for="loginPwd">密码</label>
+        <input id="loginPwd" class="input lf-input" type="password" placeholder="请输入密码" autocomplete="current-password" />
+
+        <div class="lf-row">
+          <label class="lf-remember"><input type="checkbox" id="remember" checked /> 记住登录状态</label>
+          <a class="lf-link" id="forgot" href="javascript:void(0)">忘记密码？</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary lf-submit">登 录</button>
+        <div class="lf-err" id="loginErr"></div>
+      </form>
+
+      <div class="login-foot">
+        <span>© 2026 食安科技</span>
+        <span>支持 PC / 大屏 / 移动端 · 物联网 + AI 视觉识别</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 应用主体 ================= -->
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="side-brand">
+        <div class="brand-logo small">食</div>
+        <span>食安管理平台</span>
+      </div>
+      <nav id="sideMenu" class="side-menu"><!-- 菜单由 JS 渲染 --></nav>
+      <div class="side-foot">
+        <div class="side-user">
+          <div class="avatar" id="sideAvatar">管</div>
+          <div class="side-user-meta">
+            <strong id="sideUserName">--</strong>
+            <span id="sideUserRole">--</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="icon-btn menu-toggle" id="menuToggle" title="收起/展开菜单">☰</button>
+        <div class="crumb" id="crumb">数据看板</div>
+        <div class="top-actions">
+          <div class="search-box">
+            <span class="s-icon">🔍</span>
+            <input id="globalSearch" placeholder="全局搜索（食堂 / 人员 / 设备…）" />
+          </div>
+          <button class="icon-btn" id="btnAlert" title="报警中心">
+            🔔<span class="badge-count" id="alertCount">0</span>
+          </button>
+          <button class="icon-btn" id="btnTheme" title="主题">🌗</button>
+          <button class="btn-ghost" id="btnLogout">退出</button>
+        </div>
+      </header>
+      <main id="view" class="view"><!-- 视图由 JS 渲染 --></main>
+    </div>
+  </div>
+
+  <!-- 弹窗 / Toast 容器 -->
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/views.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
