@@ -130,6 +130,10 @@
         }
         function id_preset(p){ return p ? p.id : null; }
         function openBatch() {
+          // 支持文件导入模式（如门禁管理）和默认的数量生成模式
+          if (cfg.batchType === 'file') {
+            return openBatchFile();
+          }
           const body = `<div class="field"><label>批量录入数量</label><input class="input" id="bc" type="number" value="5" min="1" max="50"/></div>
             <div class="hint">系统将依据食堂与岗位规则自动生成从业人员信息（含健康证），支持批量导入。</div>`;
           const m = UI.modal({ title: cfg.batchLabel, body, footer: `<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes">生成并录入</button>` });
@@ -137,6 +141,64 @@
             if (e.target.dataset.c === 'yes') {
               const n = Math.max(1, Math.min(50, +UI.q('#bc', m.el).value || 5));
               const cnt = cfg.onBatch(state, n); m.close(); draw(); UI.toast(`已批量录入 ${cnt} 条记录`);
+            }
+            if (e.target.dataset.c === 'no') m.close();
+          });
+        }
+        function openBatchFile() {
+          const dropId = 'drop_' + Date.now();
+          const body = `<div class="field">
+            <label>选择导入文件</label>
+            <div class="file-drop-zone" id="${dropId}">
+              <div class="file-drop-icon">📁</div>
+              <div class="file-drop-text">点击选择文件或将文件拖拽到此处</div>
+              <div class="file-drop-hint">支持 .xlsx、.xls、.csv 格式</div>
+              <input type="file" id="batchFile" accept=".xlsx,.xls,.csv" style="display:none"/>
+            </div>
+          </div>
+          <div class="field" id="fileInfo" style="display:none">
+            <label>已选文件</label>
+            <div class="file-info-bar"><span id="fileName"></span> <span id="fileSize"></span></div>
+          </div>
+          <div class="hint">文件需包含：姓名、员工编号、卡号、识别方式 等字段，系统将自动匹配食堂并记录时间。</div>`;
+          const m = UI.modal({ title: cfg.batchLabel || '批量导入', body, footer: `<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes" disabled id="btnImport">开始导入</button>`, size:'sm' });
+
+          const zone = UI.q('#' + dropId, m.el);
+          const fileInput = UI.q('#batchFile', m.el);
+          const fileInfo = UI.q('#fileInfo', m.el);
+          const fileNameEl = UI.q('#fileName', m.el);
+          const fileSizeEl = UI.q('#fileSize', m.el);
+          const btnImport = UI.q('#btnImport', m.el);
+
+          let selectedFile = null;
+
+          zone.addEventListener('click', () => fileInput.click());
+          zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+          zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+          zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if(e.dataTransfer.files.length){ handleFile(e.dataTransfer.files[0]); }});
+          fileInput.addEventListener('change', () => { if(fileInput.files.length) handleFile(fileInput.files[0]); });
+
+          function handleFile(f) {
+            selectedFile = f;
+            fileNameEl.textContent = f.name;
+            fileSizeEl.textContent = (f.size / 1024).toFixed(1) + ' KB';
+            fileInfo.style.display = '';
+            btnImport.disabled = false;
+            zone.classList.add('has-file');
+          }
+
+          m.el.addEventListener('click', async (e) => {
+            if (e.target.dataset.c === 'yes' && selectedFile && !btnImport.disabled) {
+              btnImport.disabled = true;
+              btnImport.textContent = '解析中...';
+              try {
+                const cnt = await cfg.onFileImport(state, selectedFile);
+                m.close(); draw(); UI.toast(`成功导入 ${cnt} 条门禁记录`);
+              } catch(err) {
+                btnImport.disabled = false;
+                btnImport.textContent = '开始导入';
+                UI.toast('导入失败：' + err.message, 'error');
+              }
             }
             if (e.target.dataset.c === 'no') m.close();
           });
@@ -620,7 +682,7 @@
    *  8) 门禁管理
    * ========================================================= */
   const access = DataView({
-    title:'门禁管理', icon:'access', sub:'联网单/批量录入删除', addLabel:'单个录入', batchLabel:'批量录入', rowKey:'id',
+    title:'门禁管理', icon:'access', sub:'联网单/批量录入删除', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id',
     getRows: (s, f) => applyCanteen(DB.access, f.canteen),
     searchFields: ['name','empNo','cardNo'],
     columns: [
@@ -641,6 +703,53 @@
     onBatch: (s, n) => {
       for (let i=0;i<n;i++){ DB.access.unshift({ id:'AC'+Date.now()+i, name:H.pick(['张','李','王','赵'])+H.pick(['伟','敏','静','涛']), empNo:'E'+H.pad(DB.access.length+1,4), cardNo:'C'+H.rnd(100000,999999), canteen:App.state.canteenVal==='ALL'?'C1':App.state.canteenVal, time:H.fmt(new Date()), result:Math.random()>0.06?'ok':'fail', type:H.pick(['刷卡','人脸','二维码']) }); }
       return n;
+    },
+    onFileImport: async (state, file) => {
+      // 读取文件内容（支持 CSV / 简易 Excel 文本）
+      const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.readAsText(file, 'UTF-8');
+      });
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if (lines.length < 2) throw new Error('文件数据为空，至少需要表头+1条数据');
+      // 解析 CSV（支持逗号分隔）
+      const parseRow = line => line.split(',').map(cell => cell.replace(/^"|"$/g,'').trim());
+      const headers = parseRow(lines[0]).map(h=>h.toLowerCase());
+      // 字段名映射（支持中英文）
+      const colMap = {};
+      headers.forEach((h,i) => {
+        if (/姓名|name|员工名/i.test(h)) colMap.name = i;
+        else if (/工号|编号|empno|emp_no|employee/i.test(h)) colMap.empNo = i;
+        else if (/卡号|cardno|card_no|card/i.test(h)) colMap.cardNo = i;
+        else if (/食堂|canteen/i.test(h)) colMap.canteen = i;
+        else if (/方式|类型|type/i.test(h)) colMap.type = i;
+      });
+      if (!colMap.name && !colMap.empNo) throw new Error('未找到「姓名」或「员工编号」列，请检查文件表头');
+      let cnt = 0;
+      const defCanteen = state.canteenVal === 'ALL' ? 'C1' : state.canteenVal;
+      for (let i=1; i<lines.length; i++) {
+        const cols = parseRow(lines[i]);
+        if (!cols.join('').trim()) continue;
+        const name = colMap.name != null ? cols[colMap.name] : '';
+        const empNo = colMap.empNo != null ? cols[colMap.empNo] : ('E'+H.pad(DB.access.length+cnt+1,4));
+        const cardNo = colMap.cardNo != null ? cols[colMap.cardNo] : ('C'+H.rnd(100000,999999));
+        const canteen = colMap.canteen != null ? cols[colMap.canteen] : defCanteen;
+        const type = colMap.type != null ? cols[colMap.type] : H.pick(['刷卡','人脸','二维码']);
+        if (!name || !empNo) continue;
+        DB.access.unshift({
+          id:'AC'+Date.now()+cnt,
+          name, empNo, cardNo,
+          canteen: canteen,
+          time: H.fmt(new Date()),
+          result: Math.random() > 0.06 ? 'ok' : 'fail',
+          type
+        });
+        cnt++;
+      }
+      if (cnt === 0) throw new Error('未能解析出有效数据行');
+      return cnt;
     }
   });
 

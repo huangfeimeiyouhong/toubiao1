@@ -190,6 +190,17 @@ textarea.input{height:auto;padding:10px 12px;min-width:100%;resize:vertical}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .form-grid .full{grid-column:1 / -1}
 
+/* ---------- 文件导入拖拽区 ---------- */
+.file-drop-zone{border:1.5px dashed var(--line);border-radius:12px;padding:26px 16px;text-align:center;cursor:pointer;transition:.18s;background:var(--panel-2)}
+.file-drop-zone:hover,.file-drop-zone.drag-over{border-color:var(--brand);background:var(--brand-soft)}
+.file-drop-zone.has-file{border-color:var(--ok);background:var(--ok-soft)}
+.file-drop-icon{font-size:30px;line-height:1;margin-bottom:8px}
+.file-drop-text{font-size:13.5px;color:var(--ink);font-weight:600}
+.file-drop-hint{font-size:12px;color:var(--ink-3);margin-top:4px}
+.file-info-bar{display:flex;gap:10px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--ink)}
+.file-info-bar #fileName{font-weight:600}
+.file-info-bar #fileSize{color:var(--ink-3)}
+
 /* ---------- Toast ---------- */
 .toast-root{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:10px;align-items:center}
 .toast{background:#111c34;color:#fff;padding:11px 18px;border-radius:11px;font-size:13px;box-shadow:0 12px 30px rgba(8,15,40,.35);display:flex;align-items:center;gap:9px;animation:slidein .2s ease}
