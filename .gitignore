@@ -1,0 +1,9 @@
+# WorkBuddy project memory / runtime data (not source)
+.workbuddy/
+
+# Build artifacts
+food-safety-platform.zip
+
+# OS files
+.DS_Store
+Thumbs.db
