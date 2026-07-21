@@ -31,7 +31,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
   linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
   linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
   background-size:34px 34px;mask-image:radial-gradient(circle at 50% 40%,#000,transparent 75%)}
-.login-card{position:relative;width:min(420px,92vw);background:rgba(255,255,255,.98);border-radius:22px;padding:34px 34px 26px;box-shadow:0 30px 80px rgba(8,15,40,.45);backdrop-filter:blur(6px);color:#1a2238}
+.login-card{position:relative;width:min(520px,92vw);background:rgba(255,255,255,.98);border-radius:22px;padding:34px 38px 26px;box-shadow:0 30px 80px rgba(8,15,40,.45);backdrop-filter:blur(6px);color:#1a2238}
 .login-card .login-brand p{color:#6b7790}
 .login-card .login-tip{background:var(--brand-soft);color:var(--brand-2)}
 .login-card .lf-label{color:#44506b}
@@ -58,7 +58,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .lf-link:hover{text-decoration:underline}
 .lf-submit{width:100%;margin-top:18px;height:44px;font-size:15px;letter-spacing:6px;border:none;cursor:pointer}
 .lf-err{color:var(--danger);font-size:13px;min-height:18px;margin-top:10px;text-align:center}
-.login-foot{display:flex;justify-content:space-between;margin-top:26px;color:var(--ink-3);font-size:12px}
+.login-foot{display:flex;justify-content:space-between;margin-top:26px;color:var(--ink-3);font-size:12px;white-space:nowrap}
 
 /* ---------- 应用布局 ---------- */
 .app{display:flex;height:100vh}
