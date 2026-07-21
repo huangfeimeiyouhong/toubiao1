@@ -357,11 +357,12 @@
   const iot = {
     html(state) {
       const types = DB.iotTypes;
+      // 概览卡片
       const cards = types.map(t => {
         const devs = DB.iotDevices.filter(d => d.type === t.type);
         const online = devs.filter(d => d.online).length;
         const alarm = devs.filter(d => d.status !== 'ok').length;
-        const avg = t.unit === '状态' ? '--' : (devs.reduce((s,d)=>s+(+d.value||0),0)/devs.length).toFixed(1);
+        const avg = t.unit === '状态' ? '--' : (devs.reduce((s,d)=>s+(+d.value||0),0)/Math.max(devs.length,1)).toFixed(1);
         return `<div class="card"><div class="card-head"><h3>${t.icon} ${t.type}</h3><span class="ch-sub">${devs.length} 台 · 在线 ${online}</span></div>
           <div class="card-pad">
             <div class="kpi" style="box-shadow:none;border:none;padding:0">
@@ -369,53 +370,83 @@
               <div class="k-val">${avg}</div>
               <div class="k-foot">${alarm?`<span class="badge b-danger">${alarm} 台异常</span>`:`<span class="badge b-ok">全部正常</span>`}</div>
             </div>
-            <div class="tag-row mt"><button class="btn btn-soft btn-sm" data-act="list" data-type="${t.type}">查看设备</button></div>
           </div></div>`;
       }).join('');
       return `<div class="view-narrow">
-        <div class="toolbar"><h3 style="font-size:16px">📡 物联设备总览</h3><div class="spacer"></div>
-          ${canteenFilter(App.state.canteenVal)}</div>
-        <div class="grid-3" id="iotGrid">${cards}</div>
-        <div id="iotList" class="mt"></div>
+        <div style="margin-bottom:16px"><h3 style="font-size:16px;display:inline-block;vertical-align:middle;margin-right:12px">📡 物联设备总览</h3></div>
+        <div class="grid-3" style="margin-bottom:18px">${cards}</div>
+        ${_iotList.html(state)}
       </div>`;
     },
-    mount(root, state) {
-      UI.q('[data-filter="canteen"]', root)?.addEventListener('change', () => App.refresh());
-      root.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-act="list"]'); if (!b) return;
-        const type = b.dataset.type;
-        const devs = applyCanteen(DB.iotDevices.filter(d => d.type === type), App.state.canteenVal);
-        const html = devs.map(d => {
-          const pct = d.unit==='状态' ? (d.value?100:0) : Math.min(100, (d.value - d.min)/(d.max-d.min)*100);
-          const col = d.status==='ok'?'var(--ok)':d.status==='warn'?'var(--warn)':'var(--danger)';
-          return `<div class="dev-card">
-            <div class="dc-top"><div class="dev-ico" style="background:var(--brand-soft)">${d.icon}</div>
-              <div><div style="font-weight:700">${d.name}</div><div class="muted" style="font-size:12px">${canteenName(d.canteen)}</div></div>
-              <div style="margin-left:auto">${UI.statusBadge(d.online?(d.status):'danger')}</div></div>
-            <div class="dev-val" style="color:${col}">${d.unit==='状态'?(d.value?'正常':'异常'):d.value+' '+d.unit}</div>
-            <div class="gauge"><i style="width:${pct}%;background:${col}"></i></div>
-            <div class="muted" style="font-size:12px;margin-top:8px">电量 ${d.battery}% · 更新 ${d.lastUpdate}</div>
-            <div class="tag-row mt"><button class="btn btn-line btn-sm" data-act="manage" data-id="${d.id}">管理</button></div>
-          </div>`;
-        }).join('');
-        UI.q('#iotList', root).innerHTML = `<div class="card"><div class="card-head"><h3>${type} · 设备明细</h3></div><div class="card-pad"><div class="grid-3">${html||'<div class="empty">暂无设备</div>'}</div></div></div>`;
-      });
-      root.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-act="manage"]'); if (!b) return;
-        const d = DB.iotDevices.find(x => x.id === b.dataset.id);
-        const body = `<div class="form-grid">
-          ${UI.field('设备名称', UI.input('name', d.name), true)}
-          ${UI.field('所属食堂', `<input class="input" value="${canteenName(d.canteen)}" disabled/>`)}
-          ${UI.field('当前读数', `<input class="input" value="${d.value} ${d.unit}" disabled/>`)}
-          ${UI.field('阈值下限', UI.input('min', d.min))}
-          ${UI.field('阈值上限', UI.input('max', d.max))}
-          ${UI.field('告警方式', UI.select('alm',[{v:'app',t:'App 推送'},{v:'sms',t:'短信'},{v:'sound',t:'现场声光'}],'sound'))}
-        </div><div class="hint">阈值超限时平台将自动触发对应告警方式，并可联动现场声光提醒。</div>`;
-        const m = UI.modal({ title:'设备管理 · ' + d.name, body, footer:`<button class="btn btn-line" data-c="no">关闭</button><button class="btn btn-primary" data-c="yes">保存阈值</button>` });
-        m.el.addEventListener('click', (ev) => { if (ev.target.dataset.c==='yes'){ m.close(); UI.toast('设备阈值已更新'); } if (ev.target.dataset.c==='no') m.close(); });
-      });
-    }
+    mount(root, state) { _iotList.mount(root, state); }
   };
+
+  /* 物联网设备列表（DataView） */
+  const _iotList = DataView({
+    title:'设备管理', icon:'📡', sub:'新增、编辑或删除物联设备', addLabel:'添加设备',
+    rowKey:'id',
+    getRows: (s, f) => f.canteen==='ALL'?DB.iotDevices:DB.iotDevices.filter(d=>d.canteen===f.canteen),
+    searchFields:['name','type'],
+    columns: [
+      { title:'设备编号', key:'id' },
+      { title:'设备名称', key:'name' },
+      { title:'设备类型', key:'type' },
+      { title:'所属食堂', render:r=>canteenName(r.canteen) },
+      { title:'当前读数', render:r=>r.unit==='状态'?(r.value?'正常':'异常'):r.value+' '+r.unit },
+      { title:'状态', render:r=>UI.statusBadge(r.online?(r.status||'ok'):'danger') },
+      { title:'在线', render:r=>r.online?'<span class="badge b-ok">在线</span>':'<span class="badge b-danger">离线</span>' },
+      { title:'操作', key:'__act', render:(r)=>`<button class="btn btn-sm btn-line" data-act="iot-edit" data-id="${r.id}">编辑</button>` },
+    ],
+    addFields: function(s) {
+      return [
+        { label:'设备名称', control:UI.input('name',''), full:true },
+        { label:'设备类型', control:UI.select('type', DB.iotTypes.map(t=>({v:t.type,t:t.icon+' '+t.type})), '') },
+        { label:'所属食堂', control:UI.select('canteen', [{v:'',t:'请选择'}].concat(DB.canteens.map(c=>({v:c.id,t:c.name}))), '') },
+        { label:'初始读数', control:UI.input('value','0') },
+      ];
+    },
+    onAdd: function(s, v) {
+      var tp = DB.iotTypes.find(function(t){ return t.type===v.type; });
+      if(!tp){ UI.toast('请选择有效设备类型'); return false; }
+      DB.iotDevices.push({
+        id:'D'+Date.now(), name:v.name, type:v.type,
+        icon:(tp&&tp.icon)||'📡', unit:(tp&&tp.unit)||'-',
+        canteen:v.canteen,
+        value:+v.value||0, status:'ok', online:true,
+        lastUpdate:H.fmt(new Date()), battery:100
+      });
+      return true;
+    },
+    onAction: async function(s, act, id, draw) {
+      if(act === 'iot-edit') {
+        var d = DB.iotDevices.find(function(x){ return x.id===id; }); if(!d) return;
+        var m = UI.modal({ title:'编辑设备 · '+d.name,
+          body:`<form id="frmIotE" autocomplete="off"><div class="form-grid">
+            ${UI.field('设备名称', UI.input('name',d.name), true)}
+            ${UI.field('设备类型', '<input class="input" value="'+d.icon+' '+d.type+'" disabled/>')}
+            ${UI.field('所属食堂', '<input class="input" value="'+canteenName(d.canteen)+'" disabled/>')}
+            ${UI.field('当前读数', UI.input('value',d.value))}
+            ${UI.field('在线状态', UI.select('online',[{v:'true',t:'在线'},{v:'false',t:'离线'}], String(d.online)))}
+            ${UI.field('电量 %', UI.input('battery',String(d.battery)))}
+          </div></form>`,
+          footer:`<button class="btn btn-line" data-c="no">取消</button>
+                 <button class="btn btn-primary" data-c="yes">保存修改</button>` });
+        m.el.addEventListener('click', function(ev){
+          if(ev.target.dataset.c==='no'){ m.close(); }
+          if(ev.target.dataset.c==='yes'){
+            var f=UI.q('#frmIotE');
+            if(!f.name.value.trim()){ UI.toast('请填写设备名称'); return; }
+            d.name=f.name.value.trim();
+            d.value=+f.value.value||0;
+            d.online=f.online.value==='true';
+            d.battery=Math.min(100,Math.max(0,+f.battery.value||100));
+            m.close(); draw(); UI.toast('设备已更新');
+          }
+        });
+      }
+    },
+    onDelete: function(s, id) { DB.iotDevices = DB.iotDevices.filter(function(x){ return x.id !== id; }); }
+  });
 
   /* =========================================================
    *  4) 异常行为识别报警
