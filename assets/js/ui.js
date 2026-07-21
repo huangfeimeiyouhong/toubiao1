@@ -7,7 +7,7 @@ const UI = (function () {
     dashboard:'📊', users:'👥', roles:'🛡️', perm:'🔐', sys:'⚙️',
     video:'🎥', iot:'📡', alarm:'🚨', sample:'🍱', ledger:'📒',
     patrol:'🚶', recipe:'🍳', person:'🧑‍🍳', check:'🌡️', access:'🚪',
-    review:'✅', data:'📈', canteen:'🏪', warn:'⚠️', home:'🏠'
+    review:'✅', data:'📈', canteen:'🏪', warn:'⚠️', home:'🏠', biz:'🏢'
   };
   const icon = (k) => ICONS[k] || '•';
 

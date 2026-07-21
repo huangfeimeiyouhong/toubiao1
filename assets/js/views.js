@@ -66,7 +66,7 @@
       html(state) {
         const f = { canteen: App.state.canteenVal, kw: '', extra: cfg.extraOptions ? cfg.extraOptions[0].v : '' };
         const toolbar = `<div class="toolbar">
-          ${canteenFilter(f.canteen)}
+          ${cfg.hideCanteen ? '' : canteenFilter(f.canteen)}
           ${cfg.extraOptions ? `<select class="select" data-filter="extra">${cfg.extraOptions.map(o => `<option value="${o.v}">${o.t}</option>`).join('')}</select>` : ''}
           <input class="input" data-filter="kw" placeholder="搜索…" style="min-width:170px"/>
           <div class="spacer"></div>
@@ -892,10 +892,72 @@
     }
   };
 
+  /* =========================================================
+   *  业务管理（平台管理员：食堂 / 商户档案与状态维护）
+   * ========================================================= */
+  const business = DataView({
+    title:'业务管理', icon:'biz', sub:'平台食堂 / 商户档案与状态维护', rowKey:'id', hideCanteen:true,
+    getRows: (s, f) => DB.canteens,
+    searchFields: ['id','name','manager','location'],
+    columns: [
+      { title:'编号', key:'id' },
+      { title:'食堂 / 商户', key:'name' },
+      { title:'负责人', key:'manager' },
+      { title:'位置', key:'location' },
+      { title:'状态', key:'status', render:r=>UI.statusBadge(r.status) },
+    ],
+    addLabel:'新增食堂',
+    addFields:(s)=>[
+      { label:'食堂名称', control:UI.input('name','', '如：第七食堂（员工餐厅）') },
+      { label:'负责人', control:UI.input('manager','') },
+      { label:'位置', control:UI.input('location','') },
+      { label:'状态', control:UI.select('status',[{v:'ok',t:'正常'},{v:'warn',t:'预警'},{v:'danger',t:'异常'}],'ok') },
+    ],
+    onAdd:(s,vals)=>{
+      if(!vals.name){ UI.toast('请填写食堂名称'); return false; }
+      const nid = 'C'+(DB.canteens.length+1);
+      DB.canteens.push({ id:nid, name:vals.name, manager:vals.manager||'—', location:vals.location||'—', status:vals.status||'ok' });
+      return true;
+    },
+    actions:[
+      { action:'edit', label:'编辑', cls:'btn-line' },
+      { action:'toggle', label:'停用', cls:'btn-danger', show:r=>r.status!=='disabled' },
+      { action:'toggle', label:'启用', cls:'btn-soft', show:r=>r.status==='disabled' },
+    ],
+    onAction:(s, act, id, draw)=>{
+      const c = DB.canteens.find(x=>x.id===id); if(!c) return;
+      if (act==='toggle'){
+        c.status = c.status==='disabled' ? 'ok' : 'disabled';
+        draw(); UI.toast(c.status==='disabled' ? '已停用该食堂' : '已恢复启用');
+        return;
+      }
+      if (act==='edit'){
+        const body = `<form class="form-grid" id="frmBiz">
+          ${UI.field('食堂名称', UI.input('name', c.name))}
+          ${UI.field('负责人', UI.input('manager', c.manager))}
+          ${UI.field('位置', UI.input('location', c.location))}
+          ${UI.field('状态', UI.select('status', [{v:'ok',t:'正常'},{v:'warn',t:'预警'},{v:'danger',t:'异常'},{v:'disabled',t:'已停用'}], c.status))}
+        </form>`;
+        const m = UI.modal({ title:'编辑食堂 · '+c.name, body, footer:`<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes">保存</button>` });
+        m.el.addEventListener('click', (e)=>{
+          if (e.target.dataset.c==='yes'){
+            const f = UI.q('#frmBiz', m.el);
+            c.name = UI.q('[name="name"]', f).value || c.name;
+            c.manager = UI.q('[name="manager"]', f).value || c.manager;
+            c.location = UI.q('[name="location"]', f).value || c.location;
+            c.status = UI.q('[name="status"]', f).value;
+            m.close(); draw(); UI.toast('已保存修改');
+          }
+          if (e.target.dataset.c==='no') m.close();
+        });
+      }
+    }
+  });
+
   /* ---------- 导出视图表 ---------- */
   window.Monitor = Monitor;
   window.Views = {
     dashboard, video, iot, alarm, sample, person, check, access, ledger, patrol, recipe,
-    users, roles, perm, sys, review_warn, review_patrol, data_overview
+    users, roles, perm, sys, review_warn, review_patrol, data_overview, business
   };
 })();

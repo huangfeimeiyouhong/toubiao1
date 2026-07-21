@@ -7,7 +7,7 @@ const App = (function () {
   const state = { role: null, roleName: '', account: '', canteenVal: 'ALL' };
 
   const LABELS = {
-    dashboard:'数据看板', users:'用户管理', roles:'角色管理', perm:'权限管理', sys:'参数设置',
+    dashboard:'数据看板', users:'用户管理', roles:'角色管理', perm:'权限管理', sys:'参数设置', business:'业务管理',
     video:'视频监控', iot:'物联网设备', alarm:'异常识别', sample:'留样管理', person:'人员信息',
     check:'晨午晚检', access:'门禁管理', ledger:'台账填报', patrol:'食安巡查', recipe:'菜谱维护',
     review_warn:'预警审核', review_patrol:'巡查审核', data_overview:'食安数据总览'
@@ -15,14 +15,16 @@ const App = (function () {
   const ICONS = {
     dashboard:'dashboard', users:'users', roles:'roles', perm:'perm', sys:'sys', video:'video',
     iot:'iot', alarm:'alarm', sample:'sample', person:'person', check:'check', access:'access',
-    ledger:'ledger', patrol:'patrol', recipe:'recipe', review_warn:'warn', review_patrol:'review', data_overview:'data'
+    ledger:'ledger', patrol:'patrol', recipe:'recipe', review_warn:'warn', review_patrol:'review', data_overview:'data', business:'biz'
   };
 
   const MENUS = {
     platform_admin: [
       { g:'控制台', items:['dashboard'] },
+      { g:'业务管理', items:['business'] },
       { g:'系统管理', items:['users','roles','perm','sys'] },
       { g:'食安监管', items:['video','iot','alarm','sample','person','check','access'] },
+      { g:'审核中心', items:['review_warn','review_patrol'] },
       { g:'业务填报', items:['ledger','patrol','recipe'] },
     ],
     canteen_admin: [
