@@ -42,15 +42,12 @@
     { id: 'p_review_patrol', module: '审核', name: '巡查审核', desc: '巡查记录审批' },
   ];
 
-  // ---------- 角色 ----------
+  // ---------- 角色（仅保留登录页下拉选择的 4 类身份） ----------
   const roles = [
-    { id: 'R0', name: '平台超级管理员', scope: 'platform', perms: permissions.map(p => p.id) },
-    { id: 'R1', name: '平台运营管理员', scope: 'platform', perms: ['p_dash','p_user','p_role','p_perm','p_sys','p_video','p_iot','p_alarm','p_sample','p_person','p_check','p_access'] },
+    { id: 'R0', name: '平台管理员', scope: 'platform', perms: permissions.map(p => p.id) },
     { id: 'R2', name: '食堂管理员', scope: 'canteen', perms: ['p_dash','p_user','p_role','p_video','p_sample','p_person','p_check','p_iot','p_review_warn','p_review_patrol'] },
-    { id: 'R3', name: '留样专员', scope: 'canteen', perms: ['p_dash','p_sample','p_recipe'] },
-    { id: 'R4', name: '食品安全员', scope: 'canteen', perms: ['p_dash','p_patrol','p_ledger','p_check','p_alarm'] },
-    { id: 'R5', name: '厨师 / 从业人员', scope: 'canteen', perms: ['p_dash','p_recipe','p_ledger'] },
-    { id: 'R6', name: '监管执法人员', scope: 'supervise', perms: ['p_dash','p_video','p_iot','p_alarm','p_sample','p_person','p_access'] },
+    { id: 'R5', name: '从业人员', scope: 'canteen', perms: ['p_dash','p_recipe','p_ledger'] },
+    { id: 'R6', name: '监管用户', scope: 'supervise', perms: ['p_dash','p_video','p_iot','p_alarm','p_sample','p_person','p_access'] },
   ];
 
   // ---------- 用户 ----------
@@ -58,7 +55,7 @@
   const givenNames = ['建国','秀兰','磊','强','芳','倩','伟','敏','静','涛','勇','艳','杰','娟','涛','明','霞','平','刚','丽'];
   const users = [];
   let uid = 1;
-  const rolePool = ['R1','R2','R3','R4','R5','R6'];
+  const rolePool = ['R2','R5','R6'];
   canteens.forEach((c) => {
     const n = rnd(3, 5);
     for (let i = 0; i < n; i++) {
