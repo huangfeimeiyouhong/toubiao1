@@ -58,6 +58,26 @@ const App = (function () {
     supervisor:     { u: 'sunwh',  p: 'Jgyh@1199' },
   };
 
+  /* ---------- 登录态持久化（刷新不退回登录页） ---------- */
+  const SESSION_KEY = 'fsm_session_v1';
+  function saveSession() {
+    try {
+      const remember = UI.q('#remember');
+      if (remember && !remember.checked) { localStorage.removeItem(SESSION_KEY); return; }
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ role: state.role, account: state.account, canteenVal: state.canteenVal }));
+    } catch (e) { /* 忽略写入异常（如隐私模式） */ }
+  }
+  function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (e) {} }
+  function loadSession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (s && s.role && LOGIN_ROLES.some(r => r.key === s.role)) return s;
+    } catch (e) {}
+    return null;
+  }
+
   /* ---------- 登录 ---------- */
   function renderLogin() {
     const sel = UI.q('#loginRole');
@@ -91,7 +111,7 @@ const App = (function () {
     UI.q('#loginPwd').value = a.p;
   }
 
-  function enterApp(role, account) {
+  function enterApp(role, account, restoreView) {
     state.role = role;
     state.roleName = LOGIN_ROLES.find(r => r.key === role).name;
     state.account = account;
@@ -103,7 +123,9 @@ const App = (function () {
     UI.q('#sideAvatar').textContent = (account || state.roleName).slice(0, 1).toUpperCase();
     buildMenu();
     updateAlertCount();
-    go('dashboard');
+    const target = restoreView || (location.hash.replace('#/', '') || 'dashboard');
+    go(target);
+    saveSession();
   }
 
   function buildMenu() {
@@ -165,6 +187,7 @@ const App = (function () {
     UI.q('#btnAlert').addEventListener('click', () => go('alarm'));
     UI.q('#btnLogout').addEventListener('click', async () => {
       if (await UI.confirm('确认退出当前账号？')) {
+        clearSession();
         state.role = null; UI.q('#app').classList.add('hidden'); UI.q('#login').classList.remove('hidden');
       }
     });
@@ -195,6 +218,13 @@ const App = (function () {
     renderLogin();
     bindTop();
     window.addEventListener('hashchange', onHash);
+    // 刷新后若有有效会话则直接恢复登录态，并停留在上次浏览的页面
+    const s = loadSession();
+    if (s) {
+      const hashView = location.hash.replace('#/', '') || 'dashboard';
+      enterApp(s.role, s.account, hashView);
+      if (s.canteenVal) state.canteenVal = s.canteenVal;
+    }
   }
 
   return { state, go, refresh: () => render((location.hash.replace('#/', '')) || 'dashboard'), boot };
