@@ -44,6 +44,64 @@
   const applyCanteen = (rows, v) => v === 'ALL' ? rows : rows.filter(r => r.canteen === v);
   const canteenName = DB.canteenName;
 
+  /* ---------- 文件 → data URL（图片自动压缩为缩略图，节省 localStorage 空间） ---------- */
+  function rawRead(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = () => rej(new Error('文件读取失败'));
+      r.readAsDataURL(file);
+    });
+  }
+  function canvasSupported() {
+    try { const c = document.createElement('canvas'); return !!(c.getContext && c.getContext('2d')); }
+    catch (e) { return false; }
+  }
+  async function fileToDataURL(file, maxSize = 240, quality = 0.82) {
+    if (!file) return '';
+    if (typeof window.Image === 'undefined' || typeof document === 'undefined' || !canvasSupported()) {
+      return await rawRead(file); // 无 canvas 环境（如测试）直接读原文件
+    }
+    if (!/^image\//.test(file.type)) return await rawRead(file);
+    return await new Promise((res) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        try {
+          const w = img.width, h = img.height;
+          const scale = Math.min(1, maxSize / Math.max(w, h));
+          const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = cw; canvas.height = ch;
+          canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          URL.revokeObjectURL(url);
+          res(canvas.toDataURL('image/jpeg', quality));
+        } catch (e) { URL.revokeObjectURL(url); rawRead(file).then(res); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rawRead(file).then(res); };
+      img.src = url;
+    });
+  }
+  // 收集表单值：普通字段取 value，文件字段读取为 data URL
+  async function collectVals(form) {
+    const v = {};
+    UI.qa('[name]', form).forEach(inp => {
+      if (inp.type === 'file') {
+        if (inp.files && inp.files[0]) v[inp.name] = '<<FILE>>' + inp.files[0].name; // 占位，稍后替换
+      } else {
+        v[inp.name] = inp.value;
+      }
+    });
+    // 处理文件字段
+    const fileInputs = UI.qa('input[type="file"][name]', form);
+    for (const inp of fileInputs) {
+      if (inp.files && inp.files[0]) v[inp.name] = await fileToDataURL(inp.files[0]);
+      else if (v[inp.name] && String(v[inp.name]).startsWith('<<FILE>>')) v[inp.name] = '';
+    }
+    return v;
+  }
+  const persist = () => { if (window.Persist) window.Persist.save(); };
+
   /* =========================================================
    *  通用数据视图工厂（列表 + 筛选 + 新增/批量 + 行操作）
    * ========================================================= */
@@ -103,7 +161,7 @@
           if (act === 'batch') return openBatch();
           if (act === 'del') {
             if (await UI.confirm('确认删除该记录？此操作不可撤销。', { danger: true })) {
-              cfg.onDelete(state, id); draw(); UI.toast('已删除记录');
+              cfg.onDelete(state, id); draw(); persist(); UI.toast('已删除记录');
             }
             return;
           }
@@ -118,12 +176,11 @@
             body, size: cfg.modalSize,
             footer: `<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes">保存</button>`
           });
-          m.el.addEventListener('click', (e) => {
+          m.el.addEventListener('click', async (e) => {
             if (e.target.dataset.c === 'yes') {
               const form = UI.q('#frm', m.el);
-              const vals = {};
-              UI.qa('[name]', form).forEach(inp => vals[inp.name] = inp.value);
-              if (cfg.onAdd(state, vals, kind, id_preset(preset))) { m.close(); draw(); UI.toast('保存成功'); }
+              const vals = await collectVals(form);
+              if (cfg.onAdd(state, vals, kind, id_preset(preset))) { m.close(); draw(); persist(); UI.toast('保存成功'); }
             }
             if (e.target.dataset.c === 'no') m.close();
           });
@@ -140,7 +197,7 @@
           m.el.addEventListener('click', async (e) => {
             if (e.target.dataset.c === 'yes') {
               const n = Math.max(1, Math.min(50, +UI.q('#bc', m.el).value || 5));
-              const cnt = cfg.onBatch(state, n); m.close(); draw(); UI.toast(`已批量录入 ${cnt} 条记录`);
+              const cnt = cfg.onBatch(state, n); m.close(); draw(); persist(); UI.toast(`已批量录入 ${cnt} 条记录`);
             }
             if (e.target.dataset.c === 'no') m.close();
           });
@@ -193,7 +250,7 @@
               btnImport.textContent = '解析中...';
               try {
                 const cnt = await cfg.onFileImport(state, selectedFile);
-                m.close(); draw(); UI.toast(`成功导入 ${cnt} 条门禁记录`);
+                m.close(); draw(); persist(); UI.toast(`成功导入 ${cnt} 条门禁记录`);
               } catch(err) {
                 btnImport.disabled = false;
                 btnImport.textContent = '开始导入';
@@ -502,7 +559,7 @@
             d.value=+f.value.value||0;
             d.online=f.online.value==='true';
             d.battery=Math.min(100,Math.max(0,+f.battery.value||100));
-            m.close(); draw(); UI.toast('设备已更新');
+            m.close(); draw(); persist(); UI.toast('设备已更新');
           }
         });
       }
@@ -558,7 +615,7 @@
       root.addEventListener('click', (e) => {
         const b = e.target.closest('[data-act]'); if (!b) return;
         const a = DB.alarms.find(x => x.id === b.dataset.id);
-        if (b.dataset.act === 'handle') { a.handled = true; a.handler = roleName(App.state.role); draw(); UI.toast('已标记为处理完成'); }
+        if (b.dataset.act === 'handle') { a.handled = true; a.handler = roleName(App.state.role); draw(); persist(); UI.toast('已标记为处理完成'); }
         if (b.dataset.act === 'detail') {
           UI.modal({ title:'报警详情 · ' + a.type, body:`<div class="form-grid">
             ${UI.field('报警类型', `<input class="input" value="${a.icon} ${a.type}" disabled/>`)}
@@ -620,9 +677,12 @@
       { title:'食堂', key:'canteen', render:r=>canteenName(r.canteen) },
       { title:'健康证', key:'healthStatus', render:r=>UI.statusBadge(r.healthStatus) },
       { title:'过期日期', key:'healthExpire' },
-      { title:'人脸', key:'photo', render:r=>`<span class="photo">${r.photo}</span>` },
+      { title:'人脸', key:'photo', render:r=>`<span class="photo">${/^data:image/.test(r.photo||'')?`<img src="${r.photo}" alt="${r.name}"/>`:(r.photo||'👤')}</span>` },
     ],
-    actions: [{ action:'del', label:'删除', cls:'btn-line', icon:'🗑' }],
+    actions: [
+      { action:'edit', label:'编辑', cls:'btn-line' },
+      { action:'del', label:'删除', cls:'btn-line', icon:'🗑' },
+    ],
     onDelete: (s, id) => { DB.personnel = DB.personnel.filter(x => x.id !== id); },
     addFields: (s) => [
       { label:'姓名', control:UI.input('name','') },
@@ -631,11 +691,11 @@
       { label:'所属岗位', control:UI.select('post', DB.posts.map(p=>({v:p,t:p}))) },
       { label:'所属食堂', control:UI.select('canteen', DB.canteens.map(c=>({v:c.id,t:c.name})), App.state.canteenVal==='ALL'?'C1':App.state.canteenVal) },
       { label:'健康证到期', control:UI.input('exp','2026-12-31') },
-      { label:'人脸照片', control:`<input class="input" type="file" disabled placeholder="自动采集"/>`, full:true },
+      { label:'人脸照片', control:`<input class="input" type="file" name="photo" accept="image/*"/>`, full:true },
     ],
     onAdd: (s, v) => {
       const exp = v.exp || '2026-12-31'; const d = new Date(exp);
-      DB.personnel.unshift({ id:'P'+Date.now(), empNo:'E'+H.pad(DB.personnel.length+1,4), name:v.name, phone:v.phone, post:v.post, canteen:v.canteen, healthStatus: d<new Date()?'expired':'ok', healthExpire:exp, photo:'👤' });
+      DB.personnel.unshift({ id:'P'+Date.now(), empNo:'E'+H.pad(DB.personnel.length+1,4), name:v.name, phone:v.phone, post:v.post, canteen:v.canteen, healthStatus: d<new Date()?'expired':'ok', healthExpire:exp, photo: v.photo && /^data:image/.test(v.photo) ? v.photo : '👤' });
       return true;
     },
     onBatch: (s, n) => {
@@ -643,6 +703,40 @@
       for (let i=0;i<n;i++){ const exp=new Date(); exp.setDate(exp.getDate()+H.rnd(-20,400)); const d=exp;
         DB.personnel.unshift({ id:'P'+Date.now()+i, empNo:'E'+H.pad(DB.personnel.length+1,4), name:H.pick(fn)+H.pick(gn), phone:'13'+H.rnd(100000000,999999999), post:H.pick(DB.posts), canteen:App.state.canteenVal==='ALL'?'C1':App.state.canteenVal, healthStatus:d<new Date()?'expired':'ok', healthExpire:H.fmtDate(d), photo:'👤' }); }
       return n;
+    },
+    onAction: async (s, act, id, draw) => {
+      if (act !== 'edit') return;
+      const p = DB.personnel.find(x => x.id === id); if (!p) return;
+      const preview = /^data:image/.test(p.photo||'') ? `<img class="face-preview" src="${p.photo}" alt="人脸"/>` : `<div class="face-preview face-empty">${p.photo||'👤'}</div>`;
+      const body = `<form class="form-grid" id="frmPerson">
+        ${UI.field('姓名', UI.input('name', p.name))}
+        ${UI.field('员工编号', `<input class="input" value="${p.empNo}" disabled/>`)}
+        ${UI.field('联系电话', UI.input('phone', p.phone))}
+        ${UI.field('所属岗位', UI.select('post', DB.posts.map(x=>({v:x,t:x})), p.post))}
+        ${UI.field('所属食堂', UI.select('canteen', DB.canteens.map(c=>({v:c.id,t:c.name})), p.canteen))}
+        ${UI.field('健康证到期', UI.input('exp', p.healthExpire))}
+        <div class="full"><div class="field"><label>当前人脸照片</label><div class="face-preview-wrap">${preview}</div></div></div>
+        ${UI.field('更换人脸照片', `<input class="input" type="file" name="photo" accept="image/*"/>`, true)}
+      </form>`;
+      const m = UI.modal({ title:'编辑人员 · '+p.name, body, footer:`<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes">保存</button>` });
+      m.el.addEventListener('click', async (e) => {
+        if (e.target.dataset.c === 'no') { m.close(); return; }
+        if (e.target.dataset.c === 'yes') {
+          const f = UI.q('#frmPerson', m.el);
+          const photoInput = UI.q('input[name="photo"]', f);
+          let photo = p.photo;
+          if (photoInput && photoInput.files && photoInput.files[0]) photo = await fileToDataURL(photoInput.files[0]);
+          const exp = UI.q('[name="exp"]', f).value || p.healthExpire; const ed = new Date(exp);
+          p.name = UI.q('[name="name"]', f).value || p.name;
+          p.phone = UI.q('[name="phone"]', f).value || p.phone;
+          p.post = UI.q('[name="post"]', f).value;
+          p.canteen = UI.q('[name="canteen"]', f).value;
+          p.healthExpire = exp;
+          p.healthStatus = ed < new Date() ? 'expired' : 'ok';
+          p.photo = photo;
+          m.close(); draw(); persist(); UI.toast('人员信息已更新');
+        }
+      });
     }
   });
 
@@ -932,16 +1026,24 @@
             <div class="step">💾 数据备份 <button class="btn btn-line btn-sm" data-act="backup" style="margin-left:auto">立即备份</button></div>
             <div class="step">📜 操作日志 <button class="btn btn-line btn-sm" data-act="log" style="margin-left:auto">查看</button></div>
             <div class="step">🔄 系统重启 <button class="btn btn-line btn-sm" data-act="reboot" style="margin-left:auto">重启</button></div>
+            <div class="step">🗑 重置演示数据 <button class="btn btn-danger btn-sm" data-act="reset" style="margin-left:auto">清空本地</button></div>
           </div>
-          <div class="hint mt">维护操作将记录至操作审计日志，仅平台管理员可执行。</div>
+          <div class="hint mt">维护操作将记录至操作审计日志，仅平台管理员可执行。本地数据（增删改）均保存在浏览器 localStorage，刷新不丢失；点击「清空本地」可恢复初始演示数据。</div>
         </div></div>
       </div>`;
       return body;
     },
     mount(root) {
-      root.addEventListener('click', (e) => {
+      root.addEventListener('click', async (e) => {
         const a = e.target.closest('[data-act]'); if (!a) return;
         const map = { save:'系统参数已保存', cache:'缓存清理完成', backup:'数据备份任务已创建', log:'操作日志已打开', reboot:'系统重启指令已下发' };
+        if (a.dataset.act === 'reset') {
+          if (await UI.confirm('将清空本地保存的全部业务数据并恢复初始演示数据，确认继续？', { danger: true })) {
+            if (window.Persist) window.Persist.reset();
+            location.reload();
+            return;
+          }
+        }
         UI.toast(map[a.dataset.act] || '操作完成');
       });
     }
@@ -965,8 +1067,8 @@
     ],
     onAction: (s, act, id, draw) => {
       const a = DB.alarms.find(x=>x.id===id); if(!a) return;
-      if (act==='pass'){ a.handled=true; a.handler=roleName(App.state.role); draw(); UI.toast('预警已审核通过'); }
-      if (act==='reject'){ a.handled=true; a.handler=roleName(App.state.role)+'(驳回)'; draw(); UI.toast('预警已驳回'); }
+      if (act==='pass'){ a.handled=true; a.handler=roleName(App.state.role); draw(); persist(); UI.toast('预警已审核通过'); }
+      if (act==='reject'){ a.handled=true; a.handler=roleName(App.state.role)+'(驳回)'; draw(); persist(); UI.toast('预警已驳回'); }
     }
   });
   const review_patrol = DataView({
@@ -985,7 +1087,7 @@
     onAction: (s, act, id, draw) => {
       const p = DB.patrols.find(x=>x.id===id); if(!p) return;
       p.reviewed = true; p.reviewNote = act==='pass'?'已通过':'已驳回';
-      draw(); UI.toast(act==='pass'?'巡查记录已通过':'巡查记录已驳回');
+      draw(); persist(); UI.toast(act==='pass'?'巡查记录已通过':'巡查记录已驳回');
     }
   });
 
@@ -1068,7 +1170,7 @@
       const c = DB.canteens.find(x=>x.id===id); if(!c) return;
       if (act==='toggle'){
         c.status = c.status==='disabled' ? 'ok' : 'disabled';
-        draw(); UI.toast(c.status==='disabled' ? '已停用该食堂' : '已恢复启用');
+        draw(); persist(); UI.toast(c.status==='disabled' ? '已停用该食堂' : '已恢复启用');
         return;
       }
       if (act==='edit'){
@@ -1086,7 +1188,7 @@
             c.manager = UI.q('[name="manager"]', f).value || c.manager;
             c.location = UI.q('[name="location"]', f).value || c.location;
             c.status = UI.q('[name="status"]', f).value;
-            m.close(); draw(); UI.toast('已保存修改');
+            m.close(); draw(); persist(); UI.toast('已保存修改');
           }
           if (e.target.dataset.c==='no') m.close();
         });

@@ -240,4 +240,51 @@
     access, videos, videoScenes, stats, trend,
     helpers: { rnd, pick, pad, fmt, fmtDate, daysAgo }
   };
+
+  /* =========================================================
+   *  本地持久化（localStorage）
+   *  - 用户产生的增删改均落盘，刷新/重开浏览器后保留
+   *  - 仅持久化可编辑的业务集合，统计/视频等派生数据由种子重建
+   * ========================================================= */
+  const Persist = (function () {
+    const KEY = 'fsm_db_v1';
+    // 需要持久化的可编辑集合
+    const KEYS = ['canteens', 'roles', 'users', 'iotDevices', 'alarms', 'samples', 'personnel', 'checks', 'access'];
+    function hasLS() { try { return typeof localStorage !== 'undefined' && localStorage !== null; } catch (e) { return false; } }
+    function recomputeStats() {
+      const s = global.DB.stats;
+      s.canteens = global.DB.canteens.length;
+      s.devices = global.DB.iotDevices.length;
+      s.devicesOnline = global.DB.iotDevices.filter(d => d.online).length;
+      s.devicesAlarm = global.DB.iotDevices.filter(d => d.status !== 'ok').length;
+      s.alarmsTotal = global.DB.alarms.length;
+      s.samples = global.DB.samples.length;
+      s.samplesExpired = global.DB.samples.filter(x => x.status === 'expired').length;
+      s.personnel = global.DB.personnel.length;
+      s.healthExpired = global.DB.personnel.filter(p => p.healthStatus === 'expired').length;
+    }
+    function load() {
+      if (!hasLS()) return;
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        KEYS.forEach(k => { if (saved[k] && Array.isArray(saved[k]) && saved[k].length) global.DB[k] = saved[k]; });
+        recomputeStats();
+      } catch (e) { console.warn('[Persist] load failed', e); }
+    }
+    function save() {
+      if (!hasLS()) return;
+      try {
+        recomputeStats();
+        const out = {};
+        KEYS.forEach(k => { out[k] = global.DB[k]; });
+        localStorage.setItem(KEY, JSON.stringify(out));
+      } catch (e) { console.warn('[Persist] save failed（可能超出 localStorage 容量）', e); }
+    }
+    function reset() { if (hasLS()) { try { localStorage.removeItem(KEY); } catch (e) {} } }
+    return { load, save, reset, KEYS };
+  })();
+  global.Persist = Persist;
+  Persist.load(); // 启动时优先载入本地数据覆盖种子
 })(window);
