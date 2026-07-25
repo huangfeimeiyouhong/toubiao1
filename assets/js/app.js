@@ -133,7 +133,7 @@ const App = (function () {
     const items = MENUS[state.role] || [];
     menu.innerHTML = items.map(group => `<div class="menu-group">${group.g}</div>` +
       group.items.map(id => `<div class="menu-item" data-view="${id}">
-        <span class="mi-text">${LABELS[id]}</span></div>`).join('')
+        <span class="mi-icon">${UI.icon(ICONS[id])}</span><span class="mi-text">${LABELS[id]}</span></div>`).join('')
     ).join('');
     menu.addEventListener('click', (e) => {
       const it = e.target.closest('[data-view]'); if (!it) return;
