@@ -112,11 +112,19 @@
         rows = rows.filter(r => cfg.searchFields.some(k => String(r[k] || '').toLowerCase().includes(filters.kw)));
       }
       if (filters.extra) rows = cfg.extraFilter ? cfg.extraFilter(rows, filters.extra) : rows;
-      const cols = cfg.columns.concat(cfg.actions ? [{
+      const actCol = cfg.actions ? [{
         title: '操作', key: '__act',
         render: (r) => `<div class="actions-cell">${cfg.actions.map(a => (a.show && !a.show(r)) ? '' :
           `<button class="btn btn-sm ${a.cls || 'btn-line'}" data-act="${a.action}" data-id="${r[cfg.rowKey]}">${a.icon || ''} ${a.label}</button>`).join('')}</div>`
-      }] : []);
+      }] : [];
+      let cols = cfg.columns.concat(actCol);
+      if (cfg.selectable) {
+        cols = [{
+          title: '<input type="checkbox" class="check-all" title="全选"/>',
+          key: '__ck',
+          render: (r) => `<input type="checkbox" class="row-check" data-id="${r[cfg.rowKey]}"/>`
+        }].concat(cols);
+      }
       return UI.table({ columns: cols, rows, empty: cfg.empty || '暂无数据' });
     }
 
@@ -128,6 +136,7 @@
           ${cfg.extraOptions ? `<select class="select" data-filter="extra">${cfg.extraOptions.map(o => `<option value="${o.v}">${o.t}</option>`).join('')}</select>` : ''}
           <input class="input" data-filter="kw" placeholder="搜索…" style="min-width:170px"/>
           <div class="spacer"></div>
+          ${cfg.selectable ? `<button class="btn btn-line" data-act="batchDel" disabled id="batchDelBtn">批量删除 (<span id="selCount">0</span>)</button>` : ''}
           ${cfg.batchLabel ? `<button class="btn btn-soft" data-act="batch">${cfg.batchLabel}</button>` : ''}
           ${cfg.addLabel ? `<button class="btn btn-primary" data-act="add">＋ ${cfg.addLabel}</button>` : ''}
         </div>`;
@@ -159,6 +168,15 @@
           const act = btn.dataset.act, id = btn.dataset.id;
           if (act === 'add') return openForm('add');
           if (act === 'batch') return openBatch();
+          if (act === 'batchDel') {
+            const ids = UI.qa('.row-check:checked', listArea).map(c => c.dataset.id);
+            if (!ids.length) return;
+            if (await UI.confirm(`确认删除选中的 ${ids.length} 条记录？此操作不可撤销。`, { danger: true })) {
+              cfg.onBatchDelete(state, ids); draw(); persist();
+              UI.toast(`已批量删除 ${ids.length} 条记录`);
+            }
+            return;
+          }
           if (act === 'del') {
             if (await UI.confirm('确认删除该记录？此操作不可撤销。', { danger: true })) {
               cfg.onDelete(state, id); draw(); persist(); UI.toast('已删除记录');
@@ -167,6 +185,27 @@
           }
           if (cfg.onAction) await cfg.onAction(state, act, id, draw);
         });
+
+        // 复选框：全选 / 单选 → 更新批量删除按钮状态
+        function syncBatchBtn() {
+          const btn = UI.q('#batchDelBtn', root); if (!btn) return;
+          const n = UI.qa('.row-check:checked', listArea).length;
+          btn.disabled = n === 0;
+          const cnt = UI.q('#selCount', root); if (cnt) cnt.textContent = n;
+        }
+        if (cfg.selectable) {
+          root.addEventListener('change', (e) => {
+            if (e.target.classList.contains('check-all')) {
+              UI.qa('.row-check', listArea).forEach(c => { c.checked = e.target.checked; });
+              syncBatchBtn();
+            } else if (e.target.classList.contains('row-check')) {
+              const all = UI.qa('.row-check', listArea);
+              const allChecked = all.length > 0 && all.every(c => c.checked);
+              const ca = UI.q('.check-all', listArea); if (ca) ca.checked = allChecked;
+              syncBatchBtn();
+            }
+          });
+        }
 
         function openForm(kind, preset) {
           const fields = cfg.addFields(state, preset);
@@ -646,8 +685,43 @@
       { title:'状态', key:'status', render:r=>UI.statusBadge(r.status) },
       { title:'留样影像', key:'photo', render:r=>`<span class="photo">${r.photo}</span>` },
     ],
-    actions: [{ action:'del', label:'删除', cls:'btn-line', icon:'🗑' }],
+    actions: [
+      { action:'edit', label:'编辑', cls:'btn-line' },
+      { action:'del', label:'删除', cls:'btn-line', icon:'🗑' },
+    ],
     onDelete: (s, id) => { DB.samples = DB.samples.filter(x => x.id !== id); },
+    onAction: (s, act, id, draw) => {
+      if (act !== 'edit') return;
+      const sm = DB.samples.find(x => x.id === id); if (!sm) return;
+      const body = `<form class="form-grid" id="frmSample">
+        ${UI.field('留样日期', UI.input('date', sm.date))}
+        ${UI.field('食堂', UI.select('canteen', DB.canteens.map(c=>({v:c.id,t:c.name})), sm.canteen))}
+        ${UI.field('餐次', UI.select('meal',[{v:'早餐',t:'早餐'},{v:'午餐',t:'午餐'},{v:'晚餐',t:'晚餐'}], sm.meal))}
+        ${UI.field('菜品名称', UI.input('dish', sm.dish))}
+        ${UI.field('留样人', UI.input('person', sm.person))}
+        ${UI.field('重量(g)', UI.input('weight', sm.weight))}
+        ${UI.field('留样温度(℃)', UI.input('temp', sm.temp))}
+      </form>`;
+      const m = UI.modal({ title:'编辑留样 · '+sm.dish, body, footer:`<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes">保存</button>` });
+      m.el.addEventListener('click', async (e) => {
+        if (e.target.dataset.c === 'no') { m.close(); return; }
+        if (e.target.dataset.c === 'yes') {
+          const f = UI.q('#frmSample', m.el);
+          const d = new Date(UI.q('[name="date"]', f).value);
+          const retain = new Date(d); retain.setDate(retain.getDate()+48);
+          sm.canteen = UI.q('[name="canteen"]', f).value;
+          sm.meal = UI.q('[name="meal"]', f).value;
+          sm.dish = UI.q('[name="dish"]', f).value.trim();
+          sm.person = UI.q('[name="person"]', f).value.trim();
+          sm.weight = +UI.q('[name="weight"]', f).value || 0;
+          sm.temp = +UI.q('[name="temp"]', f).value || 0;
+          sm.date = UI.q('[name="date"]', f).value;
+          sm.retainUntil = H.fmtDate(retain);
+          sm.status = retain > new Date() ? 'ok' : 'expired';
+          m.close(); draw(); persist(); UI.toast('留样信息已更新');
+        }
+      });
+    },
     addFields: (s) => [
       { label:'留样日期', control:UI.input('date', H.fmtDate(new Date()), '') },
       { label:'食堂', control:UI.select('canteen', DB.canteens.map(c=>({v:c.id,t:c.name})), App.state.canteenVal==='ALL'?'C1':App.state.canteenVal) },
@@ -776,7 +850,7 @@
    *  8) 门禁管理
    * ========================================================= */
   const access = DataView({
-    title:'门禁管理', icon:'access', sub:'联网单/批量录入删除', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id',
+    title:'门禁管理', icon:'access', sub:'联网单/批量录入删除', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id', selectable: true,
     getRows: (s, f) => applyCanteen(DB.access, f.canteen),
     searchFields: ['name','empNo','cardNo'],
     columns: [
@@ -786,6 +860,7 @@
     ],
     actions: [{ action:'del', label:'删除', cls:'btn-line', icon:'🗑' }],
     onDelete: (s, id) => { DB.access = DB.access.filter(x => x.id !== id); },
+    onBatchDelete: (s, ids) => { DB.access = DB.access.filter(x => !ids.includes(x.id)); },
     addFields: (s) => [
       { label:'姓名', control:UI.input('name','') },
       { label:'员工编号', control:UI.input('empNo','') },

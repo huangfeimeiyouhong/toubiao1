@@ -162,6 +162,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tbl td{padding:11px 14px;border-bottom:1px solid var(--line-2);white-space:nowrap}
 .tbl tbody tr:hover{background:var(--panel-2)}
 .tbl .cell-sub{color:var(--ink-3);font-size:12px}
+.tbl th:first-child,.tbl td:first-child{width:40px;text-align:center;padding-left:8px;padding-right:8px}
+.tbl .check-all,.tbl .row-check{width:16px;height:16px;cursor:pointer;accent-color:var(--brand)}
 .actions-cell{display:flex;gap:6px}
 .link{color:var(--brand);cursor:pointer;font-weight:600}
 .link:hover{text-decoration:underline}
