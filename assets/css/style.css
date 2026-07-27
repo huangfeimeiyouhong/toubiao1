@@ -222,6 +222,8 @@ textarea.input{height:auto;padding:10px 12px;min-width:100%;resize:vertical}
 .video-tile .v-name{background:rgba(0,0,0,.45);padding:3px 8px;border-radius:7px;display:flex;align-items:center;gap:6px}
 .video-tile .live{background:var(--danger);color:#fff;padding:2px 7px;border-radius:6px;font-weight:700;display:flex;align-items:center;gap:4px}
 .video-tile .live .pulse{width:7px;height:7px;border-radius:50%;background:#fff;animation:blink 1s infinite}
+.video-tile .live.off{background:rgba(120,130,145,.22);color:#aeb6c2;font-weight:600}
+.video-tile .live.off .pulse{display:none}
 @keyframes blink{50%{opacity:.2}}
 .video-tile .v-bottom{position:absolute;left:0;right:0;bottom:0;padding:8px 10px;display:flex;gap:8px;background:linear-gradient(0deg,rgba(0,0,0,.6),transparent);opacity:0;transition:.15s}
 .video-tile:hover .v-bottom{opacity:1}

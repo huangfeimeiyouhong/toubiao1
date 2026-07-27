@@ -147,6 +147,20 @@ const UI = (function () {
     </svg>`;
   }
 
-  return { icon, q, qa, toast, modal, confirm, badge, statusBadge, table, chart, destroyCharts, field, input, select, videoScene };
+  // ---------- 视频播放占位图（离线/无信号） ----------
+  function videoPlaceholder(scene, seed = 0) {
+    const id = `ph${seed}`;
+    return `<svg class="scene" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#1b2433"/><stop offset="1" stop-color="#0d121b"/></linearGradient></defs>
+      <rect width="160" height="90" fill="url(#${id})"/>
+      ${[0,12,24,36,48,60,72,84].map(y => `<rect y="${y}" width="160" height="6" fill="rgba(255,255,255,.025)"/>`).join('')}
+      <circle cx="80" cy="40" r="19" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.45)" stroke-width="2"/>
+      <path d="M73 31 L93 40 L73 49 Z" fill="rgba(255,255,255,.7)"/>
+      <text x="80" y="76" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.6)">设备离线 · 无视频信号</text>
+    </svg>`;
+  }
+
+  return { icon, q, qa, toast, modal, confirm, badge, statusBadge, table, chart, destroyCharts, field, input, select, videoScene, videoPlaceholder };
 })();
 if (typeof window !== 'undefined') window.UI = UI;

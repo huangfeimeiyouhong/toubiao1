@@ -397,10 +397,10 @@
           const v = DB.videos.find(x => x.id === id); if (!v) return '';
           const seed = (parseInt(id.replace(/\D/g,''))||i);
           return `<div class="video-tile ${v.alarm?'alarm':''}" data-vid="${v.id}">
-            ${UI.videoScene(v.scene, seed)}
+            ${v.online ? UI.videoScene(v.scene, seed) : UI.videoPlaceholder(v.scene, seed)}
             <div class="v-overlay">
               <div class="v-name">${v.online?'🟢':'⚪'} ${v.name}</div>
-              <div class="live"><span class="pulse"></span>LIVE</div>
+              ${v.online ? `<div class="live"><span class="pulse"></span>LIVE</div>` : `<div class="live off">离线</div>`}
             </div>
             ${Monitor.watermark?`<div class="watermark">食安平台·${v.canteen}·${H.fmt(new Date())}</div>`:''}
             ${v.alarm?`<div class="v-overlay" style="top:auto;bottom:46px"><span class="badge b-danger">⚠ AI 报警</span></div>`:''}
@@ -434,7 +434,11 @@
         if (act === 'watermark') { Monitor.watermark = !Monitor.watermark; el.classList.toggle('on'); render(); }
         if (act === 'refresh') { UI.toast('视频通道已刷新'); render(); }
         if (act === 'order') return openOrder(render);
-        if (act === 'shot') { flash(); UI.toast('已截图并加水印保存至本地'); }
+        if (act === 'shot') {
+          const vv = DB.videos.find(x => x.id === el.dataset.vid);
+          if (vv && !vv.online) { UI.toast('设备离线，无法截图'); return; }
+          flash(); UI.toast('已截图并加水印保存至本地');
+        }
         if (act === 'full') { const t = el.dataset.vid; UI.toast('已进入全屏模式'); }
         if (act === 'playback') return openPlayback(el.dataset.vid);
       });
@@ -471,8 +475,8 @@
     let start = 8*60, end = 20*60, cur = start, speed = 1, playing = false, timer = null;
     const min2str = (m) => `${H.pad(Math.floor(m/60)%24)}:${H.pad(m%60)}`;
     const body = `<div style="position:relative">
-      <div class="video-tile" style="aspect-ratio:16/9;position:relative">${UI.videoScene(v.scene, parseInt(vid.replace(/\D/g,''))||1)}
-        <div class="v-overlay"><div class="v-name">${v.name} · 回放</div></div>
+      <div class="video-tile" style="aspect-ratio:16/9;position:relative">${UI.videoPlaceholder(v.scene, parseInt(vid.replace(/\D/g,''))||1)}
+        <div class="v-overlay"><div class="v-name">${v.name} · ${v.online?'回放':'离线'}</div></div>
         <div class="watermark" id="wm">食安平台·${v.canteen}·水印</div>
       </div>
       <div class="toolbar mt">

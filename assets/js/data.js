@@ -206,8 +206,8 @@
     videoScenes.slice(0, rnd(4, 7)).forEach((sc, i) => {
       videos.push({
         id: `${c.id}-CAM-${i+1}`, name: `${canteenName(c.id).slice(0,4)}·${sc}`,
-        canteen: c.id, scene: sc, online: Math.random() > .1,
-        alarm: Math.random() > .8
+        canteen: c.id, scene: sc, online: false,
+        alarm: false
       });
     });
   });
