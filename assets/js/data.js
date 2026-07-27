@@ -202,15 +202,17 @@
   // ---------- 视频通道 ----------
   const videoScenes = ['收餐区','烹饪区','仓储区','留样间','洗消间','出入口','备餐区','粗加工'];
   const videos = [];
-  canteens.forEach((c) => {
-    videoScenes.slice(0, rnd(4, 7)).forEach((sc, i) => {
-      videos.push({
-        id: `${c.id}-CAM-${i+1}`, name: `${canteenName(c.id).slice(0,4)}·${sc}`,
-        canteen: c.id, scene: sc, online: false,
-        alarm: false
-      });
+  const vc = {};
+  for (let i = 0; i < 10; i++) {
+    const c = canteens[i % canteens.length];
+    const sc = videoScenes[i % videoScenes.length];
+    vc[c.id] = (vc[c.id] || 0) + 1;
+    videos.push({
+      id: `${c.id}-CAM-${vc[c.id]}`, name: `${canteenName(c.id).slice(0, 4)}·${sc}`,
+      canteen: c.id, scene: sc, online: false,
+      alarm: false
     });
-  });
+  }
 
   // ---------- 汇总统计 ----------
   const stats = {
