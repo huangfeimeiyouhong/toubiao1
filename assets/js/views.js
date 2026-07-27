@@ -383,12 +383,12 @@
         <div class="spacer"></div>
         <span class="muted" id="mc">共 ${DB.videos.length} 路通道</span>
       </div>`;
-      return `<div class="view-narrow">${bar}<div class="video-grid" id="vg"></div></div>`;
+      return `<div class="monitor-view">${bar}<div class="video-grid" id="vg"></div></div>`;
     },
     mount(root, state) {
       const vg = UI.q('#vg', root);
-      const cols = { 1:'1fr', 4:'1fr 1fr', 9:'1fr 1fr 1fr', 16:'1fr 1fr 1fr 1fr' }[Monitor.layout];
       const render = () => {
+        const cols = { 1:'1fr', 4:'1fr 1fr', 9:'1fr 1fr 1fr', 16:'1fr 1fr 1fr 1fr' }[Monitor.layout];
         let ids = Monitor.order.slice();
         if (Monitor.carousel && Monitor.current.length) ids = Monitor.current;
         const show = ids.slice(0, Monitor.layout);
