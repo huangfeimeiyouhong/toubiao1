@@ -439,7 +439,7 @@
           if (vv && !vv.online) { UI.toast('设备离线，无法截图'); return; }
           flash(); UI.toast('已截图并加水印保存至本地');
         }
-        if (act === 'full') { const t = el.dataset.vid; UI.toast('已进入全屏模式'); }
+        if (act === 'full') return openFullscreen(el.dataset.vid);
         if (act === 'playback') return openPlayback(el.dataset.vid);
       });
       const iv = UI.q('#iv', root); if (iv) iv.addEventListener('change', () => { Monitor.interval = Math.max(3, +iv.value||10); if (Monitor.carousel) startCarousel(); });
@@ -467,6 +467,35 @@
       if (e.target.dataset.c === 'yes') { m.close(); render(); UI.toast('播放顺序已保存'); }
       if (e.target.dataset.c === 'no') m.close();
     });
+  }
+
+  function openFullscreen(vid) {
+    const v = DB.videos.find(x => x.id === vid); if (!v) return;
+    const seed = parseInt(vid.replace(/\D/g, '')) || 1;
+    const mask = document.createElement('div');
+    mask.className = 'fs-mask';
+    mask.innerHTML = `
+      <div class="fs-head">
+        <div class="v-name">${v.online ? '🟢' : '⚪'} ${v.name} · ${v.canteen}</div>
+        <button class="v-btn" id="fsExit">✕ 退出全屏 (Esc)</button>
+      </div>
+      <div class="fs-stage">
+        <div class="video-tile fs-tile">
+          ${v.online ? UI.videoScene(v.scene, seed) : UI.videoPlaceholder(v.scene, seed)}
+          <div class="v-overlay">
+            <div class="v-name">${v.online ? '🟢' : '⚪'} ${v.name}</div>
+            ${v.online ? `<div class="live"><span class="pulse"></span>LIVE</div>` : `<div class="live off">离线</div>`}
+          </div>
+          ${v.alarm ? `<div class="v-overlay" style="top:auto;bottom:46px"><span class="badge b-danger">⚠ AI 报警</span></div>` : ''}
+          ${Monitor.watermark ? `<div class="watermark">食安平台·${v.canteen}·${H.fmt(new Date())}</div>` : ''}
+        </div>
+      </div>`;
+    document.body.appendChild(mask);
+    const close = () => { document.removeEventListener('keydown', onKey); mask.remove(); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+    UI.q('#fsExit', mask).addEventListener('click', close);
   }
 
   function openPlayback(vid) {

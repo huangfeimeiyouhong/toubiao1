@@ -233,6 +233,13 @@ textarea.input{height:auto;padding:10px 12px;min-width:100%;resize:vertical}
 .video-tile .watermark{position:absolute;right:12px;bottom:44px;color:rgba(255,255,255,.5);font-size:12px;transform:rotate(-12deg);pointer-events:none}
 .video-tile.alarm{border:2px solid var(--danger);box-shadow:0 0 0 4px rgba(226,72,61,.25)}
 
+/* 视频监控 · 单路全屏遮罩层 */
+.fs-mask{position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column}
+.fs-head{height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#0d121b;color:#fff;border-bottom:1px solid rgba(255,255,255,.08);flex:none}
+.fs-head .v-name{background:rgba(0,0,0,.4);padding:4px 10px;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:6px}
+.fs-stage{flex:1;min-height:0;display:flex;padding:0}
+.fs-tile{flex:1;border-radius:0!important;box-shadow:none!important;min-height:0}
+
 /* 轮播控制条 */
 .carousel-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .switch{position:relative;width:42px;height:24px;background:var(--line);border-radius:20px;transition:.2s;flex:0 0 42px}
