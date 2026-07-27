@@ -417,8 +417,8 @@
       const startCarousel = () => {
         stopCarousel();
         if (!Monitor.carousel) return;
+        if (!Monitor.current.length) Monitor.current = Monitor.order.slice();
         Monitor.timer = setInterval(() => {
-          Monitor.current = Monitor.order.slice();
           Monitor.current.push(Monitor.current.shift());
           render();
         }, Monitor.interval * 1000);
