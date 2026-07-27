@@ -30,12 +30,12 @@ const App = (function () {
     canteen_admin: [
       { g:'工作台', items:['dashboard'] },
       { g:'本食堂管理', items:['users','roles','review_warn','review_patrol'] },
-      { g:'食安监管', items:['video','sample','person','check','iot'] },
+      { g:'食安监管', items:['sample','person','check','iot'] },
     ],
     practitioner: [
       { g:'我的工作台', items:['dashboard'] },
       { g:'我的工作', items:['sample','ledger','patrol','recipe'] },
-      { g:'查看', items:['person','check','video'] },
+      { g:'查看', items:['person','check'] },
     ],
     supervisor: [
       { g:'监管视图', items:['dashboard','data_overview'] },
