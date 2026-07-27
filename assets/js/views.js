@@ -662,9 +662,7 @@
             ${UI.field('设备名称', UI.input('name',d.name), true)}
             ${UI.field('设备类型', '<input class="input" value="'+d.icon+' '+d.type+'" disabled/>')}
             ${UI.field('所属食堂', '<input class="input" value="'+canteenName(d.canteen)+'" disabled/>')}
-            ${UI.field('当前读数', UI.input('value',d.value))}
             ${UI.field('在线状态', UI.select('online',[{v:'true',t:'在线'},{v:'false',t:'离线'}], String(d.online)))}
-            ${UI.field('电量 %', UI.input('battery',String(d.battery)))}
           </div></form>`,
           footer:`<button class="btn btn-line" data-c="no">取消</button>
                  <button class="btn btn-primary" data-c="yes">保存修改</button>` });
@@ -672,11 +670,10 @@
           if(ev.target.dataset.c==='no'){ m.close(); }
           if(ev.target.dataset.c==='yes'){
             var f=UI.q('#frmIotE');
-            if(!f.name.value.trim()){ UI.toast('请填写设备名称'); return; }
-            d.name=f.name.value.trim();
-            d.value=+f.value.value||0;
-            d.online=f.online.value==='true';
-            d.battery=Math.min(100,Math.max(0,+f.battery.value||100));
+            var nameEl=f.elements['name'], onlineEl=f.elements['online'];
+            if(!nameEl.value.trim()){ UI.toast('请填写设备名称'); return; }
+            d.name=nameEl.value.trim();
+            d.online=onlineEl.value==='true';
             m.close(); draw(); persist(); UI.toast('设备已更新');
           }
         });
