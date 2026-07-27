@@ -112,13 +112,17 @@
         rows = rows.filter(r => cfg.searchFields.some(k => String(r[k] || '').toLowerCase().includes(filters.kw)));
       }
       if (filters.extra) rows = cfg.extraFilter ? cfg.extraFilter(rows, filters.extra) : rows;
+      const ro = cfg.readOnlyRoles && cfg.readOnlyRoles.includes(state.role);
       const actCol = cfg.actions ? [{
         title: '操作', key: '__act',
-        render: (r) => `<div class="actions-cell">${cfg.actions.map(a => (a.show && !a.show(r)) ? '' :
-          `<button class="btn btn-sm ${a.cls || 'btn-line'}" data-act="${a.action}" data-id="${r[cfg.rowKey]}">${a.icon || ''} ${a.label}</button>`).join('')}</div>`
+        render: (r) => {
+          const acts = cfg.actions.filter(a => !(ro && (a.action === 'edit' || a.action === 'del' || a.action === 'iot-edit')));
+          return `<div class="actions-cell">${acts.map(a => (a.show && !a.show(r)) ? '' :
+            `<button class="btn btn-sm ${a.cls || 'btn-line'}" data-act="${a.action}" data-id="${r[cfg.rowKey]}">${a.icon || ''} ${a.label}</button>`).join('')}</div>`;
+        }
       }] : [];
       let cols = cfg.columns.concat(actCol);
-      if (cfg.selectable) {
+      if (cfg.selectable && !ro) {
         cols = [{
           title: '<input type="checkbox" class="check-all" title="全选"/>',
           key: '__ck',
@@ -131,14 +135,15 @@
     return {
       html(state) {
         const f = { canteen: App.state.canteenVal, kw: '', extra: cfg.extraOptions ? cfg.extraOptions[0].v : '' };
+        const ro = cfg.readOnlyRoles && cfg.readOnlyRoles.includes(state.role);
         const toolbar = `<div class="toolbar">
           ${cfg.hideCanteen ? '' : canteenFilter(f.canteen)}
           ${cfg.extraOptions ? `<select class="select" data-filter="extra">${cfg.extraOptions.map(o => `<option value="${o.v}">${o.t}</option>`).join('')}</select>` : ''}
           <input class="input" data-filter="kw" placeholder="搜索…" style="min-width:170px"/>
           <div class="spacer"></div>
-          ${cfg.selectable ? `<button class="btn btn-line" data-act="batchDel" disabled id="batchDelBtn">批量删除 (<span id="selCount">0</span>)</button>` : ''}
-          ${cfg.batchLabel ? `<button class="btn btn-soft" data-act="batch">${cfg.batchLabel}</button>` : ''}
-          ${cfg.addLabel ? `<button class="btn btn-primary" data-act="add">＋ ${cfg.addLabel}</button>` : ''}
+          ${cfg.selectable && !ro ? `<button class="btn btn-line" data-act="batchDel" disabled id="batchDelBtn">批量删除 (<span id="selCount">0</span>)</button>` : ''}
+          ${cfg.batchLabel && !ro ? `<button class="btn btn-soft" data-act="batch">${cfg.batchLabel}</button>` : ''}
+          ${cfg.addLabel && !ro ? `<button class="btn btn-primary" data-act="add">＋ ${cfg.addLabel}</button>` : ''}
         </div>`;
         return `<div class="view-narrow">
           <div class="card">
@@ -166,6 +171,10 @@
         root.addEventListener('click', async (e) => {
           const btn = e.target.closest('[data-act]'); if (!btn) return;
           const act = btn.dataset.act, id = btn.dataset.id;
+          if (cfg.readOnlyRoles && cfg.readOnlyRoles.includes(state.role)) {
+            const isWrite = ['add','batch','batchDel','del','iot-edit'].includes(act) || (cfg.actions && cfg.actions.some(a => a.action === 'edit' && a.action === act));
+            if (isWrite) { UI.toast('当前角色无操作权限'); return; }
+          }
           if (act === 'add') return openForm('add');
           if (act === 'batch') return openBatch();
           if (act === 'batchDel') {
@@ -574,10 +583,11 @@
 
   /* 物联网设备列表（DataView） */
   const _iotList = DataView({
-    title:'设备管理', icon:'📡', sub:'新增、编辑或删除物联设备', addLabel:'添加设备',
+    title:'设备管理', icon:'📡', sub:'新增、编辑或删除物联设备', addLabel:'添加设备', readOnlyRoles: ['supervisor'],
     rowKey:'id',
     getRows: (s, f) => f.canteen==='ALL'?DB.iotDevices:DB.iotDevices.filter(d=>d.canteen===f.canteen),
     searchFields:['name','type'],
+    actions: [{ action:'iot-edit', label:'编辑', cls:'btn-line' }],
     columns: [
       { title:'设备编号', key:'id' },
       { title:'设备名称', key:'name' },
@@ -586,7 +596,6 @@
       { title:'当前读数', render:r=>r.unit==='状态'?(r.value?'正常':'异常'):r.value+' '+r.unit },
       { title:'状态', render:r=>UI.statusBadge(r.online?(r.status||'ok'):'danger') },
       { title:'在线', render:r=>r.online?'<span class="badge b-ok">在线</span>':'<span class="badge b-danger">离线</span>' },
-      { title:'操作', key:'__act', render:(r)=>`<button class="btn btn-sm btn-line" data-act="iot-edit" data-id="${r.id}">编辑</button>` },
     ],
     addFields: function(s) {
       return [
@@ -707,7 +716,7 @@
    *  5) 留样管理
    * ========================================================= */
   const sample = DataView({
-    title:'留样管理', icon:'sample', sub:'食品留样维护 / 管理 / 展示', addLabel:'新增留样', rowKey:'id',
+    title:'留样管理', icon:'sample', sub:'食品留样维护 / 管理 / 展示', addLabel:'新增留样', rowKey:'id', readOnlyRoles: ['supervisor'],
     getRows: (s, f) => applyCanteen(DB.samples, f.canteen),
     searchFields: ['dish','person','meal'],
     columns: [
@@ -883,7 +892,7 @@
    *  8) 门禁管理
    * ========================================================= */
   const access = DataView({
-    title:'门禁管理', icon:'access', sub:'联网单/批量录入删除', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id', selectable: true,
+    title:'门禁管理', icon:'access', sub:'联网单/批量录入删除', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id', selectable: true, readOnlyRoles: ['supervisor'],
     getRows: (s, f) => applyCanteen(DB.access, f.canteen),
     searchFields: ['name','empNo','cardNo'],
     columns: [
