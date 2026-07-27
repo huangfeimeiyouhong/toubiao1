@@ -725,7 +725,6 @@
       { title:'重量(g)', key:'weight' }, { title:'温度(℃)', key:'temp' },
       { title:'保留至', key:'retainUntil' },
       { title:'状态', key:'status', render:r=>UI.statusBadge(r.status) },
-      { title:'留样影像', key:'photo', render:r=>`<span class="photo">${r.photo}</span>` },
     ],
     actions: [
       { action:'edit', label:'编辑', cls:'btn-line' },
