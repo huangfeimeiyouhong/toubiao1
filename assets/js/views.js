@@ -518,11 +518,30 @@
         </div>
       </div>`;
     document.body.appendChild(mask);
-    const close = () => { document.removeEventListener('keydown', onKey); mask.remove(); };
-    const onKey = (e) => { if (e.key === 'Escape') close(); };
+
+    const onFsChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) { cleanup(); } };
+    const onKey = (e) => { if (e.key === 'Escape') cleanup(); };
+    function cleanup() {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) { try { exit.call(document); } catch (e) {} }
+      }
+      if (mask.parentNode) mask.remove();
+    }
     document.addEventListener('keydown', onKey);
-    mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
-    UI.q('#fsExit', mask).addEventListener('click', close);
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    mask.addEventListener('click', (e) => { if (e.target === mask) cleanup(); });
+    UI.q('#fsExit', mask).addEventListener('click', cleanup);
+
+    // 浏览器原生全屏（在受限 iframe 中会被拒绝 → 降级为页面内遮罩，仍可见、可退出）
+    const reqFs = mask.requestFullscreen || mask.webkitRequestFullscreen || mask.mozRequestFullScreen;
+    if (reqFs) {
+      try { Promise.resolve(reqFs.call(mask)).catch(() => {}); } catch (e) {}
+    }
   }
 
   function openPlayback(vid) {
