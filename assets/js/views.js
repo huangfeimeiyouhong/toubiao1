@@ -298,7 +298,7 @@
               btnImport.textContent = '解析中...';
               try {
                 const cnt = await cfg.onFileImport(state, selectedFile);
-                m.close(); draw(); persist(); UI.toast(`成功导入 ${cnt} 条门禁记录`);
+                m.close(); draw(); persist(); UI.toast(`成功导入 ${cnt} 条记录`);
               } catch(err) {
                 btnImport.disabled = false;
                 btnImport.textContent = '开始导入';
@@ -784,7 +784,7 @@
    *  6) 人员信息管理 + 健康证
    * ========================================================= */
   const person = DataView({
-    title:'人员信息管理', icon:'person', sub:'基本信息 + 健康证（单/批量录入删除）', addLabel:'单个录入', batchLabel:'批量录入', rowKey:'id',
+    title:'人员信息管理', icon:'person', sub:'基本信息 + 健康证（单/批量导入删除）', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id', selectable: true, readOnlyRoles: ['supervisor'],
     getRows: (s, f) => applyCanteen(DB.personnel, f.canteen),
     searchFields: ['name','empNo','post','phone'],
     columns: [
@@ -814,11 +814,63 @@
       DB.personnel.unshift({ id:'P'+Date.now(), empNo:'E'+H.pad(DB.personnel.length+1,4), name:v.name, phone:v.phone, post:v.post, canteen:v.canteen, healthStatus: d<new Date()?'expired':'ok', healthExpire:exp, photo: v.photo && /^data:image/.test(v.photo) ? v.photo : '👤' });
       return true;
     },
-    onBatch: (s, n) => {
-      const fn=['张','李','王','赵','陈','刘','杨'], gn=['伟','敏','静','涛','勇','艳','杰','娟'];
-      for (let i=0;i<n;i++){ const exp=new Date(); exp.setDate(exp.getDate()+H.rnd(-20,400)); const d=exp;
-        DB.personnel.unshift({ id:'P'+Date.now()+i, empNo:'E'+H.pad(DB.personnel.length+1,4), name:H.pick(fn)+H.pick(gn), phone:'13'+H.rnd(100000000,999999999), post:H.pick(DB.posts), canteen:App.state.canteenVal==='ALL'?'C1':App.state.canteenVal, healthStatus:d<new Date()?'expired':'ok', healthExpire:H.fmtDate(d), photo:'👤' }); }
-      return n;
+    onBatchDelete: (s, ids) => { DB.personnel = DB.personnel.filter(x => !ids.includes(x.id)); },
+    onFileImport: async (state, file) => {
+      // 读取文件内容（CSV / 文本）
+      const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.readAsText(file, 'UTF-8');
+      });
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if (lines.length < 2) throw new Error('文件数据为空，至少需要表头+1条数据');
+      const parseRow = line => line.split(',').map(cell => cell.replace(/^"|"$/g,'').trim());
+      const headers = parseRow(lines[0]).map(h=>h.toLowerCase());
+      const colMap = {};
+      headers.forEach((h,i) => {
+        if (/姓名|人员|name/i.test(h)) colMap.name = i;
+        else if (/工号|编号|empno|emp_no|employee|员工号/i.test(h)) colMap.empNo = i;
+        else if (/电话|手机|phone|mobile/i.test(h)) colMap.phone = i;
+        else if (/岗位|职务|职位|post/i.test(h)) colMap.post = i;
+        else if (/食堂|canteen/i.test(h)) colMap.canteen = i;
+        else if (/到期|过期|expire|exp|健康证日期/i.test(h)) colMap.healthExpire = i;
+        else if (/状态|status|健康证状态/i.test(h)) colMap.healthStatus = i;
+      });
+      if (colMap.name == null && colMap.empNo == null) throw new Error('未找到「姓名」或「员工编号」列，请检查文件表头');
+      const resolveCanteen = (val) => {
+        if (!val) return state.canteenVal === 'ALL' ? 'C1' : state.canteenVal;
+        const c = DB.canteens.find(x => x.id === val || x.name === val);
+        return c ? c.id : (state.canteenVal === 'ALL' ? 'C1' : state.canteenVal);
+      };
+      let cnt = 0; const defCanteen = state.canteenVal === 'ALL' ? 'C1' : state.canteenVal;
+      for (let i=1; i<lines.length; i++) {
+        const cols = parseRow(lines[i]);
+        if (!cols.join('').trim()) continue;
+        const name = colMap.name != null ? cols[colMap.name] : '';
+        const empNo = colMap.empNo != null ? cols[colMap.empNo] : ('E'+H.pad(DB.personnel.length+cnt+1,4));
+        if (!name || !empNo) continue;
+        const phone = colMap.phone != null ? cols[colMap.phone] : '';
+        const post = colMap.post != null ? cols[colMap.post] : H.pick(DB.posts);
+        const canteen = colMap.canteen != null ? resolveCanteen(cols[colMap.canteen]) : defCanteen;
+        const expireRaw = colMap.healthExpire != null ? cols[colMap.healthExpire] : '';
+        const healthExpire = expireRaw || '2026-12-31';
+        const ed = new Date(healthExpire);
+        let healthStatus;
+        if (colMap.healthStatus != null && cols[colMap.healthStatus]) {
+          healthStatus = /过期|失效|expired|invalid/i.test(cols[colMap.healthStatus]) ? 'expired' : 'ok';
+        } else {
+          healthStatus = (isNaN(ed) ? false : ed < new Date()) ? 'expired' : 'ok';
+        }
+        DB.personnel.unshift({
+          id:'P'+Date.now()+cnt, empNo, name, phone, post,
+          canteen, healthStatus, healthExpire: isNaN(ed) ? healthExpire : H.fmtDate(ed),
+          photo:'👤'
+        });
+        cnt++;
+      }
+      if (cnt === 0) throw new Error('未能解析出有效数据行');
+      return cnt;
     },
     onAction: async (s, act, id, draw) => {
       if (act !== 'edit') return;
