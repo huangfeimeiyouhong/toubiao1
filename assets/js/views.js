@@ -265,7 +265,10 @@
             <label>已选文件</label>
             <div class="file-info-bar"><span id="fileName"></span> <span id="fileSize"></span></div>
           </div>
-          <div class="hint">文件需包含：姓名、员工编号、卡号、识别方式 等字段，系统将自动匹配食堂并记录时间。</div>`;
+          <div class="hint" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span>${cfg.batchFileHint || '文件需包含与系统匹配的字段信息，系统将自动解析并导入。'}</span>
+            ${cfg.batchFileTemplate ? `<a class="btn btn-sm btn-line" id="btnDownloadTemplate" href="#">下载模板</a>` : ''}
+          </div>`;
           const m = UI.modal({ title: cfg.batchLabel || '批量导入', body, footer: `<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes" disabled id="btnImport">开始导入</button>`, size:'sm' });
 
           const zone = UI.q('#' + dropId, m.el);
@@ -290,6 +293,21 @@
             fileInfo.style.display = '';
             btnImport.disabled = false;
             zone.classList.add('has-file');
+          }
+
+          if (cfg.batchFileTemplate) {
+            UI.q('#btnDownloadTemplate', m.el).addEventListener('click', (e) => {
+              e.preventDefault();
+              const csv = '\uFEFF' + cfg.batchFileTemplate.join('\n') + '\n';
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = (cfg.title || '模板') + '_导入模板.csv';
+              document.body.appendChild(a);
+              a.click();
+              setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+            });
           }
 
           m.el.addEventListener('click', async (e) => {
@@ -784,6 +802,8 @@
    * ========================================================= */
   const person = DataView({
     title:'人员信息管理', icon:'person', sub:'基本信息 + 健康证（单/批量导入删除）', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id', selectable: true, readOnlyRoles: ['supervisor'],
+    batchFileHint: '文件需包含：姓名、员工编号、联系电话、岗位、食堂、健康证到期、状态 等字段，缺省字段将自动填充。',
+    batchFileTemplate: ['姓名,员工编号,联系电话,岗位,食堂,健康证到期,状态', '示例张三,E1001,13800000001,厨师,第一食堂,2026-12-31,有效'],
     getRows: (s, f) => applyCanteen(DB.personnel, f.canteen),
     searchFields: ['name','empNo','post','phone'],
     columns: [
@@ -944,6 +964,8 @@
    * ========================================================= */
   const access = DataView({
     title:'门禁管理', icon:'access', sub:'联网单/批量录入删除', addLabel:'单个录入', batchLabel:'批量导入', batchType:'file', rowKey:'id', selectable: true, readOnlyRoles: ['supervisor'],
+    batchFileHint: '文件需包含：姓名、员工编号、卡号、识别方式 等字段，系统将自动匹配食堂并记录时间。',
+    batchFileTemplate: ['姓名,员工编号,卡号,食堂,识别方式', '示例李四,E2001,C123456,第一食堂,人脸'],
     getRows: (s, f) => applyCanteen(DB.access, f.canteen),
     searchFields: ['name','empNo','cardNo'],
     columns: [
