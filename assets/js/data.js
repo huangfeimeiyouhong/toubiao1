@@ -199,25 +199,13 @@
     }
   });
 
-  // ---------- 门禁设备 ----------
-  const accessDevices = [];
-  const accessDeviceTypes = ['人脸门禁机', '刷卡门禁机', '二维码门禁机', '人脸刷卡一体机'];
-  const accessDeviceLocs = ['主入口', '后厨通道', '仓库入口', '备餐区入口', '洗消间入口'];
-  let adid = 1;
-  canteens.forEach((c) => {
-    const n = rnd(2, 4);
-    for (let i = 0; i < n; i++) {
-      accessDevices.push({
-        id: 'AD' + pad(adid++, 3),
-        name: `${canteenName(c.id).slice(0, 4)}·${accessDeviceLocs[i % accessDeviceLocs.length]}门禁`,
-        canteen: c.id,
-        type: pick(accessDeviceTypes),
-        location: accessDeviceLocs[i % accessDeviceLocs.length],
-        online: Math.random() > 0.15,
-        status: Math.random() > 0.9 ? 'warn' : (Math.random() > 0.95 ? 'danger' : 'ok')
-      });
-    }
-  });
+  // ---------- 门禁设备（固定 4 条演示数据）----------
+  const accessDevices = [
+    { id: 'AD001', name: '第一食堂·主入口门禁', canteen: 'C1', type: '人脸门禁机', location: '主入口', online: true, status: 'ok' },
+    { id: 'AD002', name: '第二食堂·后厨通道门禁', canteen: 'C2', type: '人脸刷卡一体机', location: '后厨通道', online: true, status: 'ok' },
+    { id: 'AD003', name: '第三食堂·仓库入口门禁', canteen: 'C3', type: '刷卡门禁机', location: '仓库入口', online: false, status: 'warn' },
+    { id: 'AD004', name: '教工食堂·备餐区入口门禁', canteen: 'C4', type: '二维码门禁机', location: '备餐区入口', online: true, status: 'ok' }
+  ];
 
   // ---------- 视频通道 ----------
   const videoScenes = ['收餐区','烹饪区','仓储区','留样间','洗消间','出入口','备餐区','粗加工'];
