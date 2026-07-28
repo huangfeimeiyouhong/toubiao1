@@ -224,13 +224,17 @@
             body, size: cfg.modalSize,
             footer: `<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes">保存</button>`
           });
-          m.el.addEventListener('click', async (e) => {
-            if (e.target.dataset.c === 'yes') {
-              const form = UI.q('#frm', m.el);
-              const vals = await collectVals(form);
-              if (cfg.onAdd(state, vals, kind, id_preset(preset))) { m.close(); draw(); persist(); UI.toast('保存成功'); }
-            }
-            if (e.target.dataset.c === 'no') m.close();
+          m.el.querySelectorAll('[data-c]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const c = btn.getAttribute('data-c');
+              if (c === 'yes') {
+                const form = UI.q('#frm', m.el);
+                const vals = await collectVals(form);
+                const r = cfg.onAdd(state, vals, kind, id_preset(preset));
+                if (r) { m.close(); draw(); persist(); UI.toast('保存成功'); }
+              }
+              if (c === 'no') m.close();
+            });
           });
         }
         function id_preset(p){ return p ? p.id : null; }
@@ -875,7 +879,7 @@
       if (colMap.name == null && colMap.empNo == null) throw new Error('未找到「姓名」或「员工编号」列，请检查文件表头');
       const resolveCanteen = (val) => {
         if (!val) return state.canteenVal === 'ALL' ? 'C1' : state.canteenVal;
-        const c = DB.canteens.find(x => x.id === val || x.name === val);
+        const c = DB.canteens.find(x => x.id === val || x.name === val || x.name.indexOf(val) >= 0 || val.indexOf(x.name) >= 0);
         return c ? c.id : (state.canteenVal === 'ALL' ? 'C1' : state.canteenVal);
       };
       let cnt = 0; const defCanteen = state.canteenVal === 'ALL' ? 'C1' : state.canteenVal;
@@ -1045,6 +1049,137 @@
           time: H.fmt(new Date()),
           result: Math.random() > 0.06 ? 'ok' : 'fail',
           type
+        });
+        cnt++;
+      }
+      if (cnt === 0) throw new Error('未能解析出有效数据行');
+      return cnt;
+    }
+  });
+
+  /* =========================================================
+   *  8.5) 门禁设备管理
+   * ========================================================= */
+  const access_device = DataView({
+    title:'门禁设备', icon:'access', sub:'门禁机硬件管理（单/批量录入）', addLabel:'添加设备', batchLabel:'批量导入', batchType:'file', rowKey:'id', selectable: true, readOnlyRoles: ['supervisor'],
+    batchFileHint: '文件需包含：设备名称、设备类型、安装位置、所属食堂、在线状态、运行状态 等字段，系统将自动匹配食堂。',
+    batchFileTemplate: ['设备名称,设备类型,安装位置,所属食堂,在线状态,运行状态', '第一食堂主门门禁机,人脸门禁机,主入口,第一食堂,在线,正常'],
+    getRows: (s, f) => applyCanteen(DB.accessDevices, f.canteen),
+    searchFields: ['id','name','type','location'],
+    columns: [
+      { title:'设备编号', key:'id' },
+      { title:'设备名称', key:'name' },
+      { title:'所属食堂', key:'canteen', render:r=>canteenName(r.canteen) },
+      { title:'设备类型', key:'type' },
+      { title:'安装位置', key:'location' },
+      { title:'在线状态', render:r=>r.online?'<span class="badge b-ok">在线</span>':'<span class="badge b-danger">离线</span>' },
+      { title:'运行状态', render:r=>UI.statusBadge(r.status) },
+    ],
+    actions: [
+      { action:'edit', label:'编辑', cls:'btn-line' },
+      { action:'del', label:'删除', cls:'btn-line', icon:'🗑' }
+    ],
+    onDelete: (s, id) => { DB.accessDevices = DB.accessDevices.filter(x => x.id !== id); },
+    onBatchDelete: (s, ids) => { DB.accessDevices = DB.accessDevices.filter(x => !ids.includes(x.id)); },
+    addFields: (s) => [
+      { label:'设备名称', control:UI.input('name','') },
+      { label:'设备类型', control:UI.select('type',[{v:'人脸门禁机',t:'人脸门禁机'},{v:'刷卡门禁机',t:'刷卡门禁机'},{v:'二维码门禁机',t:'二维码门禁机'},{v:'人脸刷卡一体机',t:'人脸刷卡一体机'}]) },
+      { label:'安装位置', control:UI.input('location','') },
+      { label:'所属食堂', control:UI.select('canteen', DB.canteens.map(c=>({v:c.id,t:c.name})), App.state.canteenVal==='ALL'?'C1':App.state.canteenVal) },
+      { label:'在线状态', control:UI.select('online',[{v:'true',t:'在线'},{v:'false',t:'离线'}], 'true') },
+      { label:'运行状态', control:UI.select('status',[{v:'ok',t:'正常'},{v:'warn',t:'预警'},{v:'danger',t:'异常'}], 'ok') },
+    ],
+    onAdd: (s, v) => {
+      if (!v.name) { UI.toast('请填写设备名称'); return false; }
+      const max = DB.accessDevices.reduce((m, d) => Math.max(m, parseInt(d.id.replace(/\D/g,''),10)||0), 0);
+      DB.accessDevices.unshift({
+        id: 'AD' + H.pad(max+1, 3),
+        name: v.name, type: v.type, location: v.location, canteen: v.canteen,
+        online: v.online === 'true', status: v.status
+      });
+      return true;
+    },
+    onAction: (s, act, id, draw) => {
+      if (act !== 'edit') return;
+      const d = DB.accessDevices.find(x => x.id === id); if (!d) return;
+      const body = `<form class="form-grid" id="frmAccessDev">
+        ${UI.field('设备名称', UI.input('name', d.name))}
+        ${UI.field('设备类型', UI.select('type',[{v:'人脸门禁机',t:'人脸门禁机'},{v:'刷卡门禁机',t:'刷卡门禁机'},{v:'二维码门禁机',t:'二维码门禁机'},{v:'人脸刷卡一体机',t:'人脸刷卡一体机'}], d.type))}
+        ${UI.field('安装位置', UI.input('location', d.location))}
+        ${UI.field('所属食堂', UI.select('canteen', DB.canteens.map(c=>({v:c.id,t:c.name})), d.canteen))}
+        ${UI.field('在线状态', UI.select('online',[{v:'true',t:'在线'},{v:'false',t:'离线'}], String(d.online)))}
+        ${UI.field('运行状态', UI.select('status',[{v:'ok',t:'正常'},{v:'warn',t:'预警'},{v:'danger',t:'异常'}], d.status))}
+      </form>`;
+      const m = UI.modal({ title:'编辑门禁设备 · '+d.name, body, footer:`<button class="btn btn-line" data-c="no">取消</button><button class="btn btn-primary" data-c="yes">保存</button>` });
+      m.el.querySelectorAll('[data-c]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const c = btn.getAttribute('data-c');
+          if (c === 'no') { m.close(); return; }
+          if (c === 'yes') {
+            const f = UI.q('#frmAccessDev', m.el);
+            if (!f.elements['name'].value.trim()) { UI.toast('请填写设备名称'); return; }
+            d.name = f.elements['name'].value.trim();
+            d.type = f.elements['type'].value;
+            d.location = f.elements['location'].value.trim();
+            d.canteen = f.elements['canteen'].value;
+            d.online = f.elements['online'].value === 'true';
+            d.status = f.elements['status'].value;
+            m.close(); draw(); persist(); UI.toast('设备已更新');
+          }
+        });
+      });
+    },
+    onFileImport: async (state, file) => {
+      const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.readAsText(file, 'UTF-8');
+      });
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if (lines.length < 2) throw new Error('文件数据为空，至少需要表头+1条数据');
+      const parseRow = line => line.split(',').map(cell => cell.replace(/^"|"$/g,'').trim());
+      const headers = parseRow(lines[0]).map(h=>h.toLowerCase());
+      const colMap = {};
+      headers.forEach((h,i) => {
+        if (/设备名称|名称|name/i.test(h)) colMap.name = i;
+        else if (/设备类型|类型|type/i.test(h)) colMap.type = i;
+        else if (/安装位置|位置|location/i.test(h)) colMap.location = i;
+        else if (/食堂|canteen/i.test(h)) colMap.canteen = i;
+        else if (/在线|online/i.test(h)) colMap.online = i;
+        else if (/状态|status|运行/i.test(h)) colMap.status = i;
+      });
+      if (colMap.name == null) throw new Error('未找到「设备名称」列，请检查文件表头');
+      const resolveCanteen = (val) => {
+        if (!val) return state.canteenVal === 'ALL' ? 'C1' : state.canteenVal;
+        const c = DB.canteens.find(x => x.id === val || x.name === val || x.name.indexOf(val) >= 0 || val.indexOf(x.name) >= 0);
+        return c ? c.id : (state.canteenVal === 'ALL' ? 'C1' : state.canteenVal);
+      };
+      const parseOnline = (val) => {
+        if (!val) return true;
+        return /离线|offline|false|否|0/i.test(val) ? false : true;
+      };
+      const parseStatus = (val) => {
+        if (!val) return 'ok';
+        if (/异常|danger|故障|错误/i.test(val)) return 'danger';
+        if (/预警|warn|警告/i.test(val)) return 'warn';
+        return 'ok';
+      };
+      let cnt = 0;
+      const max = DB.accessDevices.reduce((m, d) => Math.max(m, parseInt(d.id.replace(/\D/g,''),10)||0), 0);
+      for (let i=1; i<lines.length; i++) {
+        const cols = parseRow(lines[i]);
+        if (!cols.join('').trim()) continue;
+        const name = cols[colMap.name] || '';
+        if (!name) continue;
+        DB.accessDevices.unshift({
+          id: 'AD' + H.pad(max + cnt + 1, 3),
+          name,
+          type: colMap.type != null ? cols[colMap.type] : '人脸门禁机',
+          location: colMap.location != null ? cols[colMap.location] : '—',
+          canteen: colMap.canteen != null ? resolveCanteen(cols[colMap.canteen]) : (state.canteenVal === 'ALL' ? 'C1' : state.canteenVal),
+          online: colMap.online != null ? parseOnline(cols[colMap.online]) : true,
+          status: colMap.status != null ? parseStatus(cols[colMap.status]) : 'ok'
         });
         cnt++;
       }
@@ -1405,7 +1540,7 @@
   /* ---------- 导出视图表 ---------- */
   window.Monitor = Monitor;
   window.Views = {
-    dashboard, video, iot, alarm, sample, person, check, access, ledger, patrol, recipe,
+    dashboard, video, iot, alarm, sample, person, check, access, access_device, ledger, patrol, recipe,
     users, roles, perm, sys, review_warn, review_patrol, data_overview, business
   };
 })();

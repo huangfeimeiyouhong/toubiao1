@@ -199,6 +199,26 @@
     }
   });
 
+  // ---------- 门禁设备 ----------
+  const accessDevices = [];
+  const accessDeviceTypes = ['人脸门禁机', '刷卡门禁机', '二维码门禁机', '人脸刷卡一体机'];
+  const accessDeviceLocs = ['主入口', '后厨通道', '仓库入口', '备餐区入口', '洗消间入口'];
+  let adid = 1;
+  canteens.forEach((c) => {
+    const n = rnd(2, 4);
+    for (let i = 0; i < n; i++) {
+      accessDevices.push({
+        id: 'AD' + pad(adid++, 3),
+        name: `${canteenName(c.id).slice(0, 4)}·${accessDeviceLocs[i % accessDeviceLocs.length]}门禁`,
+        canteen: c.id,
+        type: pick(accessDeviceTypes),
+        location: accessDeviceLocs[i % accessDeviceLocs.length],
+        online: Math.random() > 0.15,
+        status: Math.random() > 0.9 ? 'warn' : (Math.random() > 0.95 ? 'danger' : 'ok')
+      });
+    }
+  });
+
   // ---------- 视频通道 ----------
   const videoScenes = ['收餐区','烹饪区','仓储区','留样间','洗消间','出入口','备餐区','粗加工'];
   const videos = [];
@@ -239,7 +259,7 @@
   global.DB = {
     canteens, canteenName, permissions, roles, users, iotDevices, iotTypes,
     alarms, alarmTypes, samples, dishes, personnel, posts, checks, checkTypes,
-    access, videos, videoScenes, stats, trend,
+    access, accessDevices, videos, videoScenes, stats, trend,
     helpers: { rnd, pick, pad, fmt, fmtDate, daysAgo }
   };
 
@@ -251,7 +271,7 @@
   const Persist = (function () {
     const KEY = 'fsm_db_v1';
     // 需要持久化的可编辑集合
-    const KEYS = ['canteens', 'roles', 'users', 'iotDevices', 'alarms', 'samples', 'personnel', 'checks', 'access'];
+    const KEYS = ['canteens', 'roles', 'users', 'iotDevices', 'alarms', 'samples', 'personnel', 'checks', 'access', 'accessDevices'];
     function hasLS() { try { return typeof localStorage !== 'undefined' && localStorage !== null; } catch (e) { return false; } }
     function recomputeStats() {
       const s = global.DB.stats;
