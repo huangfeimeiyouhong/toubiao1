@@ -475,7 +475,22 @@
         if (act === 'shot') {
           const vv = DB.videos.find(x => x.id === el.dataset.vid);
           if (vv && !vv.online) { UI.toast('设备离线，无法截图'); return; }
-          flash(); UI.toast('已截图并加水印保存至本地');
+          const tile = el.closest('.video-tile');
+          const vobj = tile ? tile.querySelector('video.v-video') : null;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (vobj && vobj.videoWidth && vobj.readyState >= 2) {
+            canvas.width = vobj.videoWidth; canvas.height = vobj.videoHeight;
+            try { ctx.drawImage(vobj, 0, 0, canvas.width, canvas.height); }
+            catch (e) { ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+          } else {
+            canvas.width = 640; canvas.height = 360;
+            ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (vv) { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '22px sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText(vv.name, 20, 180); }
+          }
+          drawWatermark(ctx, canvas.width, canvas.height, vv ? vv.canteen : '', Monitor.watermark);
+          if (downloadCanvasPng(canvas, `监控截图_${vv ? vv.name : 'video'}_${Date.now()}.png`)) { flash(); UI.toast('已截图并加水印保存至本地'); }
+          else UI.toast('截图导出失败，请重试');
         }
         if (act === 'full') return openFullscreen(el.dataset.vid);
         if (act === 'playback') return openPlayback(el.dataset.vid);
@@ -505,6 +520,29 @@
       if (e.target.dataset.c === 'yes') { m.close(); render(); UI.toast('播放顺序已保存'); }
       if (e.target.dataset.c === 'no') m.close();
     });
+  }
+
+  // 同步导出 canvas 为 PNG 下载（用 toDataURL 保住用户手势，避免被浏览器拦截）
+  function downloadCanvasPng(canvas, filename) {
+    try {
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      return true;
+    } catch (e) { return false; }
+  }
+  // 在 canvas 上叠加水印 + 时间戳（若开启水印）
+  function drawWatermark(ctx, w, h, canteen, show) {
+    if (!show) return;
+    const dt = new Date();
+    const stamp = `${dt.getFullYear()}-${H.pad(dt.getMonth()+1,2)}-${H.pad(dt.getDate(),2)} ${H.pad(dt.getHours(),2)}:${H.pad(dt.getMinutes(),2)}:${H.pad(dt.getSeconds(),2)}`;
+    const fs = Math.round(h*0.045);
+    ctx.font = `${fs}px sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`食安平台·${canteen}·水印`, Math.round(w*0.03), h - Math.round(h*0.03));
+    ctx.fillText(stamp, Math.round(w*0.03), h - Math.round(h*0.03) - Math.round(fs*1.4));
   }
 
   function openFullscreen(vid) {
@@ -610,7 +648,7 @@
         clearInterval(timer);
       }
     });
-    // 截图：抓取当前帧 + 水印 + 时间，导出 PNG
+    // 截图：抓取当前帧 + 水印 + 时间，导出 PNG（同步触发，保住用户手势）
     UI.q('#shot2', m.el).addEventListener('click', () => {
       if (!pbv) return UI.toast('无可用视频，无法截图');
       const w = pbv.videoWidth || 640, h = pbv.videoHeight || 360;
@@ -618,25 +656,10 @@
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       if (!ctx) return UI.toast('当前环境不支持截图');
-      try { ctx.drawImage(pbv, 0, 0, w, h); } catch (e) { return UI.toast('截图失败：视频未就绪'); }
-      if (UI.q('#wmt', m.el).checked) {
-        const dt = new Date();
-        const stamp = `${dt.getFullYear()}-${H.pad(dt.getMonth()+1,2)}-${H.pad(dt.getDate(),2)} ${H.pad(dt.getHours(),2)}:${H.pad(dt.getMinutes(),2)}:${H.pad(dt.getSeconds(),2)}`;
-        ctx.font = `${Math.round(h*0.045)}px sans-serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(`食安平台·${v.canteen}·水印`, Math.round(w*0.03), h - Math.round(h*0.03));
-        ctx.fillText(stamp, Math.round(w*0.03), h - Math.round(h*0.03) - Math.round(h*0.06));
-      }
-      canvas.toBlob((blob) => {
-        if (!blob) return UI.toast('截图导出失败');
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `回放截图_${v.name}_${Date.now()}.png`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        UI.toast('已截取当前帧并下载 PNG');
-      }, 'image/png');
+      try { ctx.drawImage(pbv, 0, 0, w, h); } catch (e) { ctx.fillStyle = '#111'; ctx.fillRect(0, 0, w, h); }
+      drawWatermark(ctx, w, h, v.canteen, UI.q('#wmt', m.el).checked);
+      if (downloadCanvasPng(canvas, `回放截图_${v.name}_${Date.now()}.png`)) UI.toast('已截取当前帧并下载 PNG');
+      else UI.toast('截图导出失败，请重试');
     });
     // 片段下载：导出当前回放视频源文件
     UI.q('#dl', m.el).addEventListener('click', () => {
