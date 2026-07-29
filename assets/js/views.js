@@ -427,8 +427,11 @@
         vg.innerHTML = show.map((id, i) => {
           const v = DB.videos.find(x => x.id === id); if (!v) return '';
           const seed = (parseInt(id.replace(/\D/g,''))||i);
+          const media = v.online
+            ? (v.embed ? `<iframe class="v-iframe" src="${v.embed}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>` : UI.videoScene(v.scene, seed))
+            : UI.videoPlaceholder(v.scene, seed);
           return `<div class="video-tile ${v.alarm?'alarm':''}" data-vid="${v.id}">
-            ${v.online ? UI.videoScene(v.scene, seed) : UI.videoPlaceholder(v.scene, seed)}
+            ${media}
             <div class="v-overlay">
               <div class="v-name">${v.online?'🟢':'⚪'} ${v.name}</div>
               ${v.online ? `<div class="live"><span class="pulse"></span>LIVE</div>` : `<div class="live off">离线</div>`}
@@ -512,7 +515,7 @@
       </div>
       <div class="fs-stage">
         <div class="video-tile fs-tile">
-          ${v.online ? UI.videoScene(v.scene, seed) : UI.videoPlaceholder(v.scene, seed)}
+          ${v.online ? (v.embed ? `<iframe class="v-iframe" src="${v.embed}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>` : UI.videoScene(v.scene, seed)) : UI.videoPlaceholder(v.scene, seed)}
           <div class="v-overlay">
             <div class="v-name">${v.online ? '🟢' : '⚪'} ${v.name}</div>
             ${v.online ? `<div class="live"><span class="pulse"></span>LIVE</div>` : `<div class="live off">离线</div>`}
