@@ -610,8 +610,42 @@
         clearInterval(timer);
       }
     });
-    UI.q('#shot2', m.el).addEventListener('click', () => UI.toast('已截取当前帧并加水印保存'));
-    UI.q('#dl', m.el).addEventListener('click', () => UI.toast('片段下载任务已加入队列'));
+    // 截图：抓取当前帧 + 水印 + 时间，导出 PNG
+    UI.q('#shot2', m.el).addEventListener('click', () => {
+      if (!pbv) return UI.toast('无可用视频，无法截图');
+      const w = pbv.videoWidth || 640, h = pbv.videoHeight || 360;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return UI.toast('当前环境不支持截图');
+      try { ctx.drawImage(pbv, 0, 0, w, h); } catch (e) { return UI.toast('截图失败：视频未就绪'); }
+      if (UI.q('#wmt', m.el).checked) {
+        const dt = new Date();
+        const stamp = `${dt.getFullYear()}-${H.pad(dt.getMonth()+1,2)}-${H.pad(dt.getDate(),2)} ${H.pad(dt.getHours(),2)}:${H.pad(dt.getMinutes(),2)}:${H.pad(dt.getSeconds(),2)}`;
+        ctx.font = `${Math.round(h*0.045)}px sans-serif`;
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`食安平台·${v.canteen}·水印`, Math.round(w*0.03), h - Math.round(h*0.03));
+        ctx.fillText(stamp, Math.round(w*0.03), h - Math.round(h*0.03) - Math.round(h*0.06));
+      }
+      canvas.toBlob((blob) => {
+        if (!blob) return UI.toast('截图导出失败');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `回放截图_${v.name}_${Date.now()}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        UI.toast('已截取当前帧并下载 PNG');
+      }, 'image/png');
+    });
+    // 片段下载：导出当前回放视频源文件
+    UI.q('#dl', m.el).addEventListener('click', () => {
+      if (!v.src) return UI.toast('无可用视频，无法下载');
+      const a = document.createElement('a');
+      a.href = v.src; a.download = `回放片段_${v.name}_${min2str(cur)}.mp4`;
+      document.body.appendChild(a); a.click(); a.remove();
+      UI.toast('回放片段已开始下载');
+    });
     // 鼠标移到视频上时隐藏回放进度条
     const pbVideo = UI.q('.pb-video', m.el);
     if (pbVideo) {
