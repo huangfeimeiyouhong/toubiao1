@@ -397,7 +397,7 @@
   /* =========================================================
    *  2) 视频监控（多路 / 轮播 / 回放 / 截图 / 水印）
    * ========================================================= */
-  const Monitor = { layout:4, carousel:false, interval:10, watermark:true, order:null, timer:null, current:[], };
+  const Monitor = { layout:4, carousel:false, interval:10, watermark:true, order:null, timer:null, current:[], clockTimer:null, };
   const video = {
     html(state) {
       if (!Monitor.order) Monitor.order = DB.videos.map(v => v.id);
@@ -418,6 +418,8 @@
     },
     mount(root, state) {
       const vg = UI.q('#vg', root);
+      const clockStr = () => { const d = new Date(); return `${H.pad(d.getHours(),2)}:${H.pad(d.getMinutes(),2)}:${H.pad(d.getSeconds(),2)}`; };
+      const startClock = () => { if (Monitor.clockTimer) clearInterval(Monitor.clockTimer); Monitor.clockTimer = setInterval(() => { vg.querySelectorAll('[data-clock]').forEach(el => { el.textContent = clockStr(); }); }, 1000); };
       const render = () => {
         const cols = { 1:'1fr', 4:'1fr 1fr', 9:'1fr 1fr 1fr', 16:'1fr 1fr 1fr 1fr' }[Monitor.layout];
         let ids = Monitor.order.slice();
@@ -428,7 +430,8 @@
           const v = DB.videos.find(x => x.id === id); if (!v) return '';
           const seed = (parseInt(id.replace(/\D/g,''))||i);
           const media = v.online
-            ? (v.embed ? `<iframe class="v-iframe" src="${v.embed}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>` : UI.videoScene(v.scene, seed))
+            ? (v.src ? `<video class="v-video" src="${v.src}" autoplay loop muted playsinline preload="auto"></video><div class="v-clock" data-clock>${clockStr()}</div>`
+                     : (v.embed ? `<iframe class="v-iframe" src="${v.embed}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>` : UI.videoScene(v.scene, seed)))
             : UI.videoPlaceholder(v.scene, seed);
           return `<div class="video-tile ${v.alarm?'alarm':''}" data-vid="${v.id}">
             ${media}
@@ -447,6 +450,7 @@
         }).join('');
       };
       render();
+      startClock();
 
       const startCarousel = () => {
         stopCarousel();
@@ -506,6 +510,7 @@
   function openFullscreen(vid) {
     const v = DB.videos.find(x => x.id === vid); if (!v) return;
     const seed = parseInt(vid.replace(/\D/g, '')) || 1;
+    const fsClock = () => { const d = new Date(); return `${H.pad(d.getHours(),2)}:${H.pad(d.getMinutes(),2)}:${H.pad(d.getSeconds(),2)}`; };
     const mask = document.createElement('div');
     mask.className = 'fs-mask';
     mask.innerHTML = `
@@ -515,7 +520,7 @@
       </div>
       <div class="fs-stage">
         <div class="video-tile fs-tile">
-          ${v.online ? (v.embed ? `<iframe class="v-iframe" src="${v.embed}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>` : UI.videoScene(v.scene, seed)) : UI.videoPlaceholder(v.scene, seed)}
+          ${v.online ? (v.src ? `<video class="v-video" src="${v.src}" autoplay loop muted playsinline preload="auto"></video><div class="v-clock" data-fsclock>${fsClock()}</div>` : (v.embed ? `<iframe class="v-iframe" src="${v.embed}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>` : UI.videoScene(v.scene, seed))) : UI.videoPlaceholder(v.scene, seed)}
           <div class="v-overlay">
             <div class="v-name">${v.online ? '🟢' : '⚪'} ${v.name}</div>
             ${v.online ? `<div class="live"><span class="pulse"></span>LIVE</div>` : `<div class="live off">离线</div>`}
@@ -526,9 +531,12 @@
       </div>`;
     document.body.appendChild(mask);
 
+    const fsClockTimer = v.online && v.src ? setInterval(() => { const el = mask.querySelector('[data-fsclock]'); if (el) el.textContent = fsClock(); }, 1000) : null;
+
     const onFsChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) { cleanup(); } };
     const onKey = (e) => { if (e.key === 'Escape') cleanup(); };
     function cleanup() {
+      if (fsClockTimer) clearInterval(fsClockTimer);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('fullscreenchange', onFsChange);
       document.removeEventListener('webkitfullscreenchange', onFsChange);
@@ -557,7 +565,7 @@
     let start = 8*60, end = 20*60, cur = start, speed = 1, playing = false, timer = null;
     const min2str = (m) => `${H.pad(Math.floor(m/60)%24)}:${H.pad(m%60)}`;
     const body = `<div style="position:relative">
-      <div class="video-tile" style="aspect-ratio:16/9;position:relative">${UI.videoPlaceholder(v.scene, parseInt(vid.replace(/\D/g,''))||1)}
+      <div class="video-tile" style="aspect-ratio:16/9;position:relative">${v.src ? `<video class="v-video" src="${v.src}" controls autoplay preload="auto"></video>` : UI.videoPlaceholder(v.scene, parseInt(vid.replace(/\D/g,''))||1)}
         <div class="v-overlay"><div class="v-name">${v.name} · ${v.online?'回放':'离线'}</div></div>
         <div class="watermark" id="wm">食安平台·${v.canteen}·水印</div>
       </div>

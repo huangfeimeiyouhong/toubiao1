@@ -220,6 +220,8 @@ textarea.input{height:auto;padding:10px 12px;min-width:100%;resize:vertical}
 .video-tile{position:relative;background:#0a1228;border-radius:12px;overflow:hidden;min-height:0;min-width:0;box-shadow:var(--shadow)}
 .video-tile .scene{position:absolute;inset:0;width:100%;height:100%}
 .video-tile .v-iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.video-tile .v-video{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;object-fit:cover}
+.video-tile .v-clock{position:absolute;left:10px;bottom:46px;color:#fff;font-size:13px;font-variant-numeric:tabular-nums;background:rgba(0,0,0,.5);padding:2px 9px;border-radius:6px;pointer-events:none;text-shadow:0 1px 3px #000}
 .video-tile .v-overlay,.video-tile .v-bottom{pointer-events:none}
 .video-tile .v-btn{pointer-events:auto}
 .video-tile .v-overlay{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;color:#fff;font-size:12px;text-shadow:0 1px 3px #000}

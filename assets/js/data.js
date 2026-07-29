@@ -221,10 +221,10 @@
       alarm: false
     });
   }
-  // 第一个视频窗口嵌入在线直播页（safemeal），并标记为在线
+  // 第一个视频窗口使用本地视频文件（直播/回放同源），并标记为在线
   if (videos[0]) {
     videos[0].online = true;
-    videos[0].embed = '//www.safemeal.cn/m/#/pages/monitor/monitor?id=8828';
+    videos[0].src = 'assets/videos/20260729103204.mp4';
   }
 
   // ---------- 汇总统计 ----------
