@@ -244,6 +244,7 @@ textarea.input{height:auto;padding:10px 12px;min-width:100%;resize:vertical}
 .fs-head .v-name{background:rgba(0,0,0,.4);padding:4px 10px;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:6px}
 .fs-stage{flex:1;min-height:0;display:flex;padding:0}
 .fs-tile{flex:1;border-radius:0!important;box-shadow:none!important;min-height:0}
+.fs-tile .v-clock{left:18px;bottom:64px;font-size:20px;padding:4px 14px}
 
 /* 轮播控制条 */
 .carousel-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}

@@ -418,7 +418,7 @@
     },
     mount(root, state) {
       const vg = UI.q('#vg', root);
-      const clockStr = () => { const d = new Date(); return `${H.pad(d.getHours(),2)}:${H.pad(d.getMinutes(),2)}:${H.pad(d.getSeconds(),2)}`; };
+      const clockStr = () => { const d = new Date(); return `${d.getFullYear()}-${H.pad(d.getMonth()+1,2)}-${H.pad(d.getDate(),2)} ${H.pad(d.getHours(),2)}:${H.pad(d.getMinutes(),2)}:${H.pad(d.getSeconds(),2)}`; };
       const startClock = () => { if (Monitor.clockTimer) clearInterval(Monitor.clockTimer); Monitor.clockTimer = setInterval(() => { vg.querySelectorAll('[data-clock]').forEach(el => { el.textContent = clockStr(); }); }, 1000); };
       const render = () => {
         const cols = { 1:'1fr', 4:'1fr 1fr', 9:'1fr 1fr 1fr', 16:'1fr 1fr 1fr 1fr' }[Monitor.layout];
@@ -510,7 +510,7 @@
   function openFullscreen(vid) {
     const v = DB.videos.find(x => x.id === vid); if (!v) return;
     const seed = parseInt(vid.replace(/\D/g, '')) || 1;
-    const fsClock = () => { const d = new Date(); return `${H.pad(d.getHours(),2)}:${H.pad(d.getMinutes(),2)}:${H.pad(d.getSeconds(),2)}`; };
+    const fsClock = () => { const d = new Date(); return `${d.getFullYear()}-${H.pad(d.getMonth()+1,2)}-${H.pad(d.getDate(),2)} ${H.pad(d.getHours(),2)}:${H.pad(d.getMinutes(),2)}:${H.pad(d.getSeconds(),2)}`; };
     const mask = document.createElement('div');
     mask.className = 'fs-mask';
     mask.innerHTML = `
