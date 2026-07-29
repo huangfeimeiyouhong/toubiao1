@@ -562,18 +562,22 @@
   function openPlayback(vid) {
     const v = DB.videos.find(x => x.id === vid);
     const speeds = [0.5,1,2,4,8,16];
-    let start = 8*60, end = 20*60, cur = start, speed = 1, playing = false, timer = null;
+    const now = new Date();
+    const end = now.getHours()*60 + now.getMinutes();
+    const start = Math.max(0, end - 30);
+    let cur = start, speed = 1, playing = false, timer = null;
     const min2str = (m) => `${H.pad(Math.floor(m/60)%24)}:${H.pad(m%60)}`;
-    const body = `<div style="position:relative">
-      <div class="video-tile" style="aspect-ratio:16/9;position:relative">${v.src ? `<video class="v-video" src="${v.src}" controls autoplay preload="auto"></video>` : UI.videoPlaceholder(v.scene, parseInt(vid.replace(/\D/g,''))||1)}
+    const timeInput = (m) => `${H.pad(Math.floor(m/60)%24)}:${H.pad(m%60)}`;
+    const body = `<div class="pb-wrap" style="position:relative">
+      <div class="video-tile pb-video" style="aspect-ratio:16/9;position:relative">${v.src ? `<video class="v-video" id="pbv" src="${v.src}" preload="auto" playsinline></video>` : UI.videoPlaceholder(v.scene, parseInt(vid.replace(/\D/g,''))||1)}
         <div class="v-overlay"><div class="v-name">${v.name} · ${v.online?'回放':'离线'}</div></div>
         <div class="watermark" id="wm">食安平台·${v.canteen}·水印</div>
       </div>
       <div class="toolbar mt">
         <span>倍速</span><select class="select" id="spd">${speeds.map(s=>`<option value="${s}">${s}x</option>`).join('')}</select>
-        <span>回放日期</span><input class="input" id="pdate" type="date" value="${H.fmtDate(new Date())}" style="width:160px"/>
-        <span>起</span><input class="input" id="st" type="time" value="08:00" style="width:110px"/>
-        <span>止</span><input class="input" id="et" type="time" value="20:00" style="width:110px"/>
+        <span>回放日期</span><input class="input" id="pdate" type="date" value="${H.fmtDate(now)}" style="width:160px"/>
+        <span>起</span><input class="input" id="st" type="time" value="${timeInput(start)}" style="width:110px"/>
+        <span>止</span><input class="input" id="et" type="time" value="${timeInput(end)}" style="width:110px"/>
       </div>
       <div class="timeline" id="tl"><div class="tl-fill" id="tlf"></div><div class="tl-now" id="tln"></div></div>
       <div class="toolbar">
@@ -587,20 +591,33 @@
     </div>`;
     const m = UI.modal({ title:`回放 · ${v.name}`, body, size:'lg', footer:false });
     const tlf = UI.q('#tlf', m.el), tln = UI.q('#tln', m.el), ctime = UI.q('#ctime', m.el);
+    const pbv = UI.q('#pbv', m.el);
     const update = () => { const pct = (cur - start) / (end - start) * 100; tlf.style.width = pct + '%'; tln.style.left = pct + '%'; ctime.textContent = min2str(cur); };
     update();
     UI.q('#spd', m.el).addEventListener('change', e => speed = +e.target.value);
     UI.q('#st', m.el).addEventListener('change', e => { const [h,mm]=e.target.value.split(':').map(Number); start=h*60+mm; if(cur<start)cur=start; update(); });
     UI.q('#et', m.el).addEventListener('change', e => { const [h,mm]=e.target.value.split(':').map(Number); end=h*60+mm; update(); });
     UI.q('#wmt', m.el).addEventListener('change', e => UI.q('#wm', m.el).style.display = e.target.checked ? '' : 'none');
-    UI.q('#tl', m.el).addEventListener('click', e => { const r = e.currentTarget.getBoundingClientRect(); cur = start + (e.clientX - r.left)/r.width*(end-start); update(); });
-    UI.q('#play', m.el).addEventListener('click', e => {
-      playing = !playing; e.target.textContent = playing ? '⏸ 暂停' : '▶ 播放';
-      if (playing) timer = setInterval(() => { cur += speed; if (cur >= end) { cur = end; playing=false; e.target.textContent='▶ 播放'; clearInterval(timer);} update(); }, 200);
-      else clearInterval(timer);
+    UI.q('#tl', m.el).addEventListener('click', e => { const r = e.currentTarget.getBoundingClientRect(); cur = start + (e.clientX - r.left)/r.width*(end-start); if(pbv) pbv.currentTime = (cur-start)*2; update(); });
+    const playBtn = UI.q('#play', m.el);
+    playBtn.addEventListener('click', () => {
+      playing = !playing; playBtn.textContent = playing ? '⏸ 暂停' : '▶ 播放';
+      if (playing) {
+        if(pbv) pbv.play().catch(()=>{});
+        timer = setInterval(() => { cur += speed; if (cur >= end) { cur = end; playing=false; playBtn.textContent='▶ 播放'; if(pbv) pbv.pause(); clearInterval(timer);} update(); }, 200);
+      } else {
+        if(pbv) pbv.pause();
+        clearInterval(timer);
+      }
     });
     UI.q('#shot2', m.el).addEventListener('click', () => UI.toast('已截取当前帧并加水印保存'));
     UI.q('#dl', m.el).addEventListener('click', () => UI.toast('片段下载任务已加入队列'));
+    // 鼠标移到视频上时隐藏回放进度条
+    const pbVideo = UI.q('.pb-video', m.el);
+    if (pbVideo) {
+      pbVideo.addEventListener('mouseenter', () => m.el.classList.add('pb-hover-video'));
+      pbVideo.addEventListener('mouseleave', () => m.el.classList.remove('pb-hover-video'));
+    }
   }
 
   /* =========================================================

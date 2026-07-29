@@ -254,7 +254,8 @@ textarea.input{height:auto;padding:10px 12px;min-width:100%;resize:vertical}
 .switch.on::after{left:21px}
 
 /* 时间轴 / 回放 */
-.timeline{position:relative;height:46px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;margin:14px 0;overflow:hidden}
+.timeline{position:relative;height:46px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;margin:14px 0;overflow:hidden;transition:opacity .2s}
+.pb-hover-video .timeline{opacity:0;pointer-events:none}
 .timeline .tl-fill{position:absolute;top:0;bottom:0;left:0;background:linear-gradient(90deg,#2f6bff55,#2f6bff);width:35%}
 .timeline .tl-now{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--danger)}
 .timeline .tl-mark{position:absolute;top:0;bottom:0;width:3px;background:var(--warn);opacity:.8}
