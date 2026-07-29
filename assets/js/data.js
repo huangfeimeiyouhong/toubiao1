@@ -224,7 +224,7 @@
   // 第一个视频窗口嵌入在线直播页（safemeal），并标记为在线
   if (videos[0]) {
     videos[0].online = true;
-    videos[0].embed = 'http://www.safemeal.cn/m/#/pages/monitor/monitor?id=8828';
+    videos[0].embed = '//www.safemeal.cn/m/#/pages/monitor/monitor?id=8828';
   }
 
   // ---------- 汇总统计 ----------
